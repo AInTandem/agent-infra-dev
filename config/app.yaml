@@ -1,0 +1,56 @@
+# Application Configuration
+
+app:
+  name: "Qwen Agent MCP Scheduler"
+  version: "0.1.0"
+  debug: false
+
+# Server Configuration
+server:
+  host: "0.0.0.0"
+  api_port: 8000
+  gui_port: 7860
+  cors_origins:
+    - "http://localhost:7860"
+    - "http://127.0.0.1:7860"
+
+# Storage Configuration
+storage:
+  base_dir: "./storage"
+  tasks_dir: "./storage/tasks"
+  logs_dir: "./storage/logs"
+  max_log_size: 10485760  # 10MB
+  log_rotation: 5  # 保留 5 個日誌檔案
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "rich"  # rich, text, json
+  console: true
+  file: true
+
+# Scheduler Configuration
+scheduler:
+  enabled: true
+  timezone: "Asia/Shanghai"
+  max_concurrent_tasks: 5
+  task_persistence: true  # 持久化任務到檔案
+
+# Sandbox Configuration
+sandbox:
+  enabled: false  # 預設停用，生產環境建議啟用
+  isolation_level: "basic"  # basic, strict, docker
+  allowed_paths:
+    - "./storage"
+    - "./config"
+  blocked_commands:
+    - "rm -rf"
+    - "dd"
+    - "mkfs"
+
+# Agent Configuration
+agent:
+  max_history_length: 100
+  history_ttl: 86400  # 24 hours
+  default_timeout: 300  # 5 minutes
+  enable_streaming: true
