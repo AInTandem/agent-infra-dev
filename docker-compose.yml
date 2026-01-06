@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  # Qwen Agent MCP Scheduler - Main Service
+  qwen-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qwen-agent-scheduler
+    ports:
+      - "8000:8000"  # FastAPI server
+      - "7860:7860"  # Gradio GUI
+    environment:
+      # Application settings
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+      # LLM Provider Keys
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+
+      # MCP Server Keys (optional)
+      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+
+      # Database (optional, for future use)
+      - DATABASE_URL=${DATABASE_URL:-}
+    volumes:
+      # Configuration files (read-only)
+      - ./config:/app/config:ro
+      # Storage for tasks and logs
+      - qwen-storage:/app/storage
+      # Custom agents configuration (optional)
+      - ./config/agents.yaml:/app/config/agents.yaml:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - qwen-network
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Optional: Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: qwen-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - qwen-agent
+    restart: unless-stopped
+    networks:
+      - qwen-network
+    profiles:
+      - with-nginx
+
+  # Optional: Redis for caching (future use)
+  redis:
+    image: redis:7-alpine
+    container_name: qwen-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - qwen-network
+    profiles:
+      - with-redis
+
+  # Optional: PostgreSQL for task persistence (future use)
+  postgres:
+    image: postgres:15-alpine
+    container_name: qwen-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-qwen_agent}
+      - POSTGRES_USER=${POSTGRES_USER:-agent}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - qwen-network
+    profiles:
+      - with-postgres
+
+# Named volumes
+volumes:
+  qwen-storage:
+    driver: local
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+
+# Network
+networks:
+  qwen-network:
+    driver: bridge
