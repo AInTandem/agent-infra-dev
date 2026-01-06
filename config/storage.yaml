@@ -1,0 +1,74 @@
+# Storage Configuration for Qwen Agent MCP Scheduler
+
+# Select the storage type: sqlite (personal) or postgresql (enterprise)
+storage:
+  type: sqlite
+
+  # SQLite Configuration (Personal Edition)
+  sqlite:
+    path: "./storage/data.db"           # Path to database file
+    pool_size: 5                         # Connection pool size
+    enable_wal: true                     # Enable WAL mode for better concurrency
+    journal_mode: "WAL"                  # Journal mode: WAL, DELETE, TRUNCATE, PERSIST, MEMORY, OFF
+
+  # PostgreSQL Configuration (Enterprise Edition)
+  #postgresql:
+  #  host: "${DB_HOST}"                  # Use environment variable
+  #  port: 5432
+  #  database: "qwen_agent"
+  #  user: "${DB_USER}"
+  #  password: "${DB_PASSWORD}"
+  #  pool_size: 20                       # Connection pool size
+  #  max_overflow: 40                    # Max overflow connections
+  #  pool_recycle: 3600                  # Recycle connections after 1 hour
+  #  echo: false                         # Log SQL statements (debug only)
+  #  ssl_mode: null                      # SSL mode: require, verify-ca, verify-full
+
+# Cache Configuration (Enterprise Edition)
+cache:
+  type: none                             # none, redis, memory
+
+  # Redis Configuration
+  #redis:
+  #  host: "${REDIS_HOST}"
+  #  port: 6379
+  #  db: 0
+  #  password: "${REDIS_PASSWORD}"
+  #  pool_size: 10
+  #  socket_timeout: 5.0
+  #  socket_connect_timeout: 5.0
+  #  decode_responses: true
+  #  ssl: false
+
+  # In-Memory Cache (for testing)
+  #memory:
+  #  max_size: 1000                      # Maximum number of items
+  #  default_ttl: 300                    # Default TTL in seconds
+
+# Vector Store Configuration (Future - for RAG)
+vector_store:
+  type: none                             # none, qdrant, milvus, pinecone, weaviate, chroma
+  default_collection: "qwen_agent"
+  embedding_model: "text-embedding-ada-002"
+
+  # Qdrant Configuration
+  #qdrant:
+  #  url: "http://localhost:6333"        # Qdrant HTTP URL
+  #  api_key: "${QDRANT_API_KEY}"
+  #  timeout: 5.0
+  #  https: false
+
+  # Milvus Configuration
+  #milvus:
+  #  host: "localhost"
+  #  port: 19530
+  #  user: ""
+  #  password: ""
+  #  database: "default"
+  #  timeout: 10.0
+
+  # Pinecone Configuration
+  #pinecone:
+  #  api_key: "${PINECONE_API_KEY}"
+  #  environment: "us-west1-gcp"
+  #  project_name: ""
