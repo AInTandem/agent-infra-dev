@@ -1,6 +1,6 @@
 # Qwen Agent MCP Scheduler
 
-A comprehensive local agent infrastructure built with Qwen Agent SDK, featuring MCP server integration, task scheduling, OpenAI-compatible API, and Gradio GUI.
+A comprehensive local agent infrastructure built with Qwen Agent SDK, featuring MCP server integration, task scheduling, OpenAI-compatible API, Gradio GUI, and dual-edition storage support.
 
 ## Features
 
@@ -10,6 +10,7 @@ A comprehensive local agent infrastructure built with Qwen Agent SDK, featuring 
 - **OpenAI-Compatible API**: REST API compatible with OpenAI's chat completions and function calling
 - **Gradio GUI**: User-friendly web interface for managing agents and tasks
 - **Sandbox Execution**: Isolated execution environment with resource limits and security policies
+- **Dual Edition Storage**: Support for both Personal (SQLite) and Enterprise (PostgreSQL + Redis) deployments
 
 ## Architecture
 
@@ -96,6 +97,77 @@ DEEPSEEK_API_KEY=your_deepseek_key
    - `config/agents.yaml` - Agent definitions
    - `config/mcp_servers.yaml` - MCP server configurations
    - `config/app.yaml` - Application settings
+   - `config/storage.yaml` - Storage and cache configuration
+
+### Storage Configuration
+
+The system supports two deployment editions with different storage backends:
+
+#### Personal Edition (SQLite)
+
+Single-container deployment with embedded SQLite database:
+
+```yaml
+# config/storage.yaml
+storage:
+  type: sqlite
+  sqlite:
+    path: "./storage/data.db"
+    enable_wal: true
+
+cache:
+  type: memory
+  max_size: 1000
+  default_ttl: 300
+```
+
+**Features**:
+- No external dependencies
+- Easy backup (single file)
+- Suitable for personal use and testing
+
+#### Enterprise Edition (PostgreSQL + Redis)
+
+Multi-instance deployment with production-grade storage:
+
+```yaml
+# config/storage.yaml
+storage:
+  type: postgresql
+  postgresql:
+    host: "${DB_HOST}"
+    port: 5432
+    database: qwen_agent
+    user: "${DB_USER}"
+    password: "${DB_PASSWORD}"
+    pool_size: 20
+
+cache:
+  type: redis
+  redis:
+    host: "${REDIS_HOST}"
+    port: 6379
+    password: "${REDIS_PASSWORD}"
+```
+
+**Features**:
+- Horizontal scaling support
+- Connection pooling
+- Distributed caching
+- Suitable for production and multi-user environments
+
+#### File-based Storage (Legacy)
+
+For backward compatibility, the system supports file-based storage:
+
+```yaml
+storage:
+  type: file
+cache:
+  type: none
+```
+
+This uses JSON files in `storage/tasks/` for persistence.
 
 ### Running the Application
 
@@ -343,7 +415,8 @@ agent-infra/
 │   ├── llm.yaml           # LLM provider settings
 │   ├── agents.yaml        # Agent definitions
 │   ├── mcp_servers.yaml   # MCP server configs
-│   └── app.yaml           # Application settings
+│   ├── app.yaml           # Application settings
+│   └── storage.yaml       # Storage & cache configuration
 ├── src/
 │   ├── core/              # Core components
 │   │   ├── config.py      # Configuration management
@@ -352,22 +425,35 @@ agent-infra/
 │   │   ├── mcp_bridge.py  # MCP integration
 │   │   ├── sandbox.py     # Sandbox environment
 │   │   ├── resource_limiter.py  # Resource limits
-│   │   └── security.py    # Security policies
+│   │   ├── security.py    # Security policies
+│   │   └── storage_helpers.py  # Storage adapter helpers
+│   ├── storage/           # Storage Adapter Layer
+│   │   ├── base_adapter.py      # Storage adapter interface
+│   │   ├── base_cache.py        # Cache adapter interface
+│   │   ├── base_vector_store.py # Vector store interface (RAG)
+│   │   ├── factory.py           # Adapter factory
+│   │   ├── config.py            # Storage configuration models
+│   │   ├── sqlite_adapter.py     # SQLite implementation
+│   │   ├── postgres_adapter.py   # PostgreSQL implementation
+│   │   └── redis_cache.py        # Cache implementations
 │   ├── agents/            # Agent implementations
 │   │   └── base_agent.py  # Base agent class
 │   ├── api/               # REST API
 │   │   └── openapi_server.py  # FastAPI server
 │   └── gui/               # Web interface
 │       └── app.py         # Gradio GUI
-├── storage/               # Local storage
+├── storage/               # Local storage (legacy)
 │   ├── tasks/             # Task persistence
 │   └── logs/              # Application logs
 ├── tests/                 # Test suite
 │   ├── test_*.py          # Unit tests
+│   ├── test_storage_adapters.py  # Storage layer tests
 │   └── test_integration.py # Integration tests
 ├── worklogs/              # Development logs
-│   └── qwen-agent-mcp-scheduler/
-│       └── phase-*.md     # Phase reports
+│   └── storage-adapter-layer/  # Storage adapter implementation
+│       └── *.md          # Phase reports
+├── plans/                 # Implementation plans
+│   └── storage-adapter-layer.md  # Storage adapter plan
 ├── main.py                # Application entry point
 ├── requirements.txt       # Python dependencies
 ├── pyproject.toml        # Project metadata
@@ -389,6 +475,16 @@ agent-infra/
 
 - `mcp` - Model Context Protocol SDK
 - `anyio` - Async IO
+
+### Storage Dependencies
+
+**Personal Edition (SQLite)**:
+- `aiosqlite` - Async SQLite adapter
+
+**Enterprise Edition (PostgreSQL + Redis)**:
+- `sqlalchemy` - SQL ORM and toolkit
+- `asyncpg` - Async PostgreSQL driver
+- `redis` - Redis client for distributed caching
 
 ### Utility Dependencies
 

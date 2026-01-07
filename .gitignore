@@ -62,7 +62,9 @@ ENV/
 Thumbs.db
 
 # Application specific
+storage/data.db
 storage/tasks/*
+storage/test_tasks/*
 storage/logs/*
 !storage/tasks/.gitkeep
 !storage/logs/.gitkeep
