@@ -5,6 +5,7 @@ Manages multiple agent instances with MCP tool integration.
 """
 
 import asyncio
+import hashlib
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
@@ -23,12 +24,14 @@ class AgentManager:
     - MCP tool assignment
     - Agent lifecycle management
     - Agent lookup and routing
+    - Response caching (optional)
     """
 
     def __init__(
         self,
         config_manager: Optional[ConfigManager] = None,
         mcp_bridge: Optional[MCPBridge] = None,
+        cache_adapter: Optional[Any] = None,
     ):
         """
         Initialize the AgentManager.
@@ -36,13 +39,19 @@ class AgentManager:
         Args:
             config_manager: Configuration manager instance
             mcp_bridge: MCP Bridge for tool integration
+            cache_adapter: Optional CacheAdapter for response caching
         """
         self.config_manager = config_manager or ConfigManager()
         self.mcp_bridge = mcp_bridge
+        self.cache_adapter = cache_adapter
 
         self._agents: Dict[str, BaseAgent] = {}
         self._llm_registry: Dict[str, Any] = {}
         self._is_initialized = False
+
+        # Cache configuration
+        self._cache_ttl = 600  # 10 minutes default TTL
+        self._use_cache = cache_adapter is not None
 
     async def initialize(
         self,
@@ -312,6 +321,7 @@ class AgentManager:
         self,
         name: str,
         prompt: str,
+        use_cache: Optional[bool] = None,
         **kwargs
     ) -> List[Any]:
         """
@@ -320,6 +330,7 @@ class AgentManager:
         Args:
             name: Agent name
             prompt: User prompt
+            use_cache: Whether to use response cache (default: auto-detect)
             **kwargs: Additional arguments
 
         Returns:
@@ -329,7 +340,50 @@ class AgentManager:
         if not agent:
             raise ValueError(f"Agent {name} not found")
 
-        return await agent.run_async(prompt, **kwargs)
+        # Check cache if enabled
+        if use_cache is None:
+            use_cache = self._use_cache
+
+        if use_cache and self.cache_adapter:
+            # Generate cache key
+            cache_key = self._generate_cache_key(name, prompt, kwargs)
+
+            # Try to get from cache
+            cached_response = await self.cache_adapter.get(cache_key)
+            if cached_response is not None:
+                logger.debug(f"[{name}] Cache hit for key: {cache_key[:16]}...")
+                return cached_response
+
+            logger.debug(f"[{name}] Cache miss for key: {cache_key[:16]}...")
+
+        # Run the agent
+        response = await agent.run_async(prompt, **kwargs)
+
+        # Store in cache if enabled
+        if use_cache and self.cache_adapter:
+            cache_key = self._generate_cache_key(name, prompt, kwargs)
+            from datetime import timedelta
+            await self.cache_adapter.set(cache_key, response, timedelta(seconds=self._cache_ttl))
+            logger.debug(f"[{name}] Cached response with key: {cache_key[:16]}...")
+
+        return response
+
+    def _generate_cache_key(self, agent_name: str, prompt: str, kwargs: Dict[str, Any]) -> str:
+        """
+        Generate a cache key for agent response.
+
+        Args:
+            agent_name: Name of the agent
+            prompt: User prompt
+            kwargs: Additional arguments
+
+        Returns:
+            Cache key string
+        """
+        # Create a deterministic hash of the inputs
+        key_data = f"{agent_name}:{prompt}:{sorted(kwargs.items())}"
+        hash_obj = hashlib.sha256(key_data.encode())
+        return f"agent_response:{agent_name}:{hash_obj.hexdigest()[:16]}"
 
     def get_agent_stats(self, name: str) -> Optional[Dict[str, Any]]:
         """Get statistics for an agent."""
@@ -355,6 +409,67 @@ class AgentManager:
         """Get the number of agents."""
         return len(self._agents)
 
+    @property
+    def has_cache(self) -> bool:
+        """Check if cache is available."""
+        return self._use_cache and self.cache_adapter is not None
+
+    async def clear_agent_cache(self, agent_name: Optional[str] = None) -> int:
+        """
+        Clear cached responses for an agent or all agents.
+
+        Args:
+            agent_name: Optional agent name. If None, clears all agent caches.
+
+        Returns:
+            Number of cache keys cleared
+        """
+        if not self.cache_adapter:
+            logger.warning("No cache adapter available")
+            return 0
+
+        if agent_name:
+            # Clear cache for specific agent
+            pattern = f"agent_response:{agent_name}:*"
+            count = await self.cache_adapter.clear_pattern(pattern)
+            logger.info(f"Cleared {count} cached responses for agent: {agent_name}")
+        else:
+            # Clear all agent caches
+            pattern = "agent_response:*"
+            count = await self.cache_adapter.clear_pattern(pattern)
+            logger.info(f"Cleared {count} cached responses for all agents")
+
+        return count
+
+    async def get_cache_stats(self) -> Dict[str, Any]:
+        """
+        Get cache statistics.
+
+        Returns:
+            Cache statistics dictionary
+        """
+        if not self.cache_adapter:
+            return {"enabled": False}
+
+        # Get all agent cache keys
+        pattern = "agent_response:*"
+        keys = await self.cache_adapter.keys(pattern)
+
+        # Count by agent
+        agent_counts: Dict[str, int] = {}
+        for key in keys:
+            # Extract agent name from key: "agent_response:agent_name:hash"
+            parts = key.split(":")
+            if len(parts) >= 3:
+                agent = parts[2]
+                agent_counts[agent] = agent_counts.get(agent, 0) + 1
+
+        return {
+            "enabled": True,
+            "total_entries": len(keys),
+            "by_agent": agent_counts,
+        }
+
     def __repr__(self) -> str:
         """String representation."""
         return (
@@ -371,6 +486,7 @@ _agent_manager: Optional[AgentManager] = None
 async def get_agent_manager(
     config_manager: Optional[ConfigManager] = None,
     mcp_bridge: Optional[MCPBridge] = None,
+    cache_adapter: Optional[Any] = None,
     force_refresh: bool = False
 ) -> AgentManager:
     """
@@ -379,6 +495,7 @@ async def get_agent_manager(
     Args:
         config_manager: Optional configuration manager
         mcp_bridge: Optional MCP Bridge
+        cache_adapter: Optional CacheAdapter for response caching
         force_refresh: Force re-initialization
 
     Returns:
@@ -387,7 +504,7 @@ async def get_agent_manager(
     global _agent_manager
 
     if _agent_manager is None or force_refresh:
-        _agent_manager = AgentManager(config_manager)
+        _agent_manager = AgentManager(config_manager, cache_adapter=cache_adapter)
         await _agent_manager.initialize(mcp_bridge)
 
     return _agent_manager

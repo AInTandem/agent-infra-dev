@@ -243,6 +243,7 @@ class ConfigManager:
         self._llm_config: Optional[LLMConfig] = None
         self._agents: Dict[str, AgentConfig] = {}
         self._mcp_servers: Dict[str, MCPServerConfig] = {}
+        self._storage_config: Optional[Dict[str, Any]] = None
 
     def load_all(self) -> None:
         """Load all configuration files."""
@@ -250,6 +251,7 @@ class ConfigManager:
         self.load_llm_config()
         self.load_agents()
         self.load_mcp_servers()
+        self.load_storage_config()
 
     def load_app_config(self) -> AppConfig:
         """Load application configuration from app.yaml."""
@@ -319,6 +321,29 @@ class ConfigManager:
 
         return self._mcp_servers
 
+    def load_storage_config(self) -> Dict[str, Any]:
+        """Load storage configuration from storage.yaml."""
+        import yaml
+
+        config_file = self.config_dir / "storage.yaml"
+        if not config_file.exists():
+            # Return default config (file-based storage)
+            self._storage_config = {
+                "storage": {
+                    "type": "file"
+                }
+            }
+            return self._storage_config
+
+        with open(config_file, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+
+        # Substitute environment variables
+        data = substitute_env_recursive(data)
+
+        self._storage_config = data
+        return self._storage_config
+
     # ========================================================================
     # Getter methods
     # ========================================================================
@@ -351,6 +376,13 @@ class ConfigManager:
             self.load_mcp_servers()
         return self._mcp_servers
 
+    @property
+    def storage(self) -> Dict[str, Any]:
+        """Get storage configuration."""
+        if self._storage_config is None:
+            self.load_storage_config()
+        return self._storage_config
+
     def get_agent(self, name: str) -> Optional[AgentConfig]:
         """Get a specific agent configuration by name."""
         return self._agents.get(name)
@@ -373,6 +405,7 @@ class ConfigManager:
         self._llm_config = None
         self._agents.clear()
         self._mcp_servers.clear()
+        self._storage_config = None
         self.load_all()
 
 

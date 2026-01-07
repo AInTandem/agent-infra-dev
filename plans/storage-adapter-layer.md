@@ -785,11 +785,16 @@ async def benchmark_concurrent_access():
 
 | 里程碑 | 目標 | 驗收標準 | 狀態 |
 |--------|------|---------|------|
-| M1 | Interface Design | 抽象介面完成，工廠模式實現 | ⏳ 待開始 |
-| M2 | SQLite Adapter | SQLite 適配器可用，測試通過 | ⏳ 待開始 |
-| M3 | PostgreSQL Adapter | PostgreSQL 適配器可用，測試通過 | ⏳ 待開始 |
-| M4 | Redis Cache | Redis 緩存可用，測試通過 | ⏳ 待開始 |
-| M5 | Integration | 系統整合完成，E2E 測試通過 | ⏳ 待開始 |
+| M1 | Interface Design | 抽象介面完成，工廠模式實現 | ✅ 完成 |
+| M2 | SQLite Adapter | SQLite 適配器可用，測試通過 | ✅ 完成 |
+| M3 | PostgreSQL Adapter | PostgreSQL 適配器可用，測試通過 | ✅ 完成 |
+| M4 | Redis Cache | Redis 緩存可用，測試通過 | ✅ 完成 |
+| M5 | Integration | 系統整合完成，E2E 測試通過 | ⏳ 進行中 |
+
+**說明**:
+- M1-M4 已完成核心實作，包括抽象介面、SQLite、PostgreSQL、Redis/Memory Cache
+- 27 個單元測試全部通過
+- M5 需要整合到現有系統（TaskScheduler、AgentManager）
 
 ---
 

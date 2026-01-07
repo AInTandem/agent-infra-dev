@@ -23,12 +23,14 @@ SCHEMA_SQL = """
 -- Tasks table
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
     agent_name TEXT NOT NULL,
     task_prompt TEXT NOT NULL,
     schedule_type TEXT NOT NULL,
     schedule_value TEXT NOT NULL,
     repeat INTEGER DEFAULT 0,
     repeat_interval TEXT,
+    description TEXT,
     enabled INTEGER DEFAULT 1,
     created_at TEXT NOT NULL,
     last_run TEXT,
@@ -150,17 +152,19 @@ class SQLiteAdapter(StorageAdapter):
             await conn.execute(
                 """
                 INSERT INTO tasks (
-                    id, agent_name, task_prompt, schedule_type, schedule_value,
-                    repeat, repeat_interval, enabled, created_at, last_run,
+                    id, name, agent_name, task_prompt, schedule_type, schedule_value,
+                    repeat, repeat_interval, description, enabled, created_at, last_run,
                     next_run, status, result, error
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
+                    name = excluded.name,
                     agent_name = excluded.agent_name,
                     task_prompt = excluded.task_prompt,
                     schedule_type = excluded.schedule_type,
                     schedule_value = excluded.schedule_value,
                     repeat = excluded.repeat,
                     repeat_interval = excluded.repeat_interval,
+                    description = excluded.description,
                     enabled = excluded.enabled,
                     last_run = excluded.last_run,
                     next_run = excluded.next_run,
@@ -170,12 +174,14 @@ class SQLiteAdapter(StorageAdapter):
                 """,
                 (
                     task_id,
+                    task.get("name", ""),
                     task.get("agent_name"),
                     task.get("task_prompt"),
                     task.get("schedule_type"),
                     task.get("schedule_value"),
                     1 if task.get("repeat", False) else 0,
                     task.get("repeat_interval"),
+                    task.get("description", ""),
                     1 if task.get("enabled", True) else 0,
                     created_at or datetime.utcnow().isoformat(),
                     last_run,
@@ -463,8 +469,8 @@ class SQLiteAdapter(StorageAdapter):
     def _row_to_task(self, row: tuple) -> Dict[str, Any]:
         """Convert database row to task dictionary."""
         columns = [
-            "id", "agent_name", "task_prompt", "schedule_type", "schedule_value",
-            "repeat", "repeat_interval", "enabled", "created_at", "last_run",
+            "id", "name", "agent_name", "task_prompt", "schedule_type", "schedule_value",
+            "repeat", "repeat_interval", "description", "enabled", "created_at", "last_run",
             "next_run", "status", "result", "error"
         ]
         task = dict(zip(columns, row))
