@@ -53,6 +53,7 @@ from core.hot_reload import HotReloadManager
 from core.mcp_bridge import MCPBridge
 from core.storage_helpers import create_adapters_from_config
 from core.task_scheduler import TaskScheduler
+from core.websocket_manager import get_websocket_manager
 from gui.app import GradioApp
 
 console = Console()
@@ -299,6 +300,13 @@ class Application:
         # Stop task scheduler
         if self.task_scheduler:
             await self.task_scheduler.stop()
+
+        # Cleanup WebSocket connections
+        try:
+            ws_manager = get_websocket_manager()
+            await ws_manager.cleanup_all()
+        except Exception as e:
+            logger.debug(f"WebSocket cleanup error: {e}")
 
         # Close storage adapter
         if self.storage_adapter:

@@ -38,6 +38,7 @@ from core.agent_manager import AgentManager
 from core.config import ConfigManager
 from core.task_models import ScheduleType
 from core.task_scheduler import TaskScheduler, get_task_scheduler
+from core.websocket_manager import WebSocketManager, get_websocket_manager
 
 
 # ============================================================================
@@ -271,6 +272,7 @@ class APIServer:
                     "chat_completions": "/v1/chat/completions",
                     "agents": "/v1/agents",
                     "tasks": "/v1/tasks",
+                    "websocket": "/ws/chat/{session_id}",
                 }
             }
 
@@ -364,6 +366,17 @@ class APIServer:
             if not success:
                 raise HTTPException(status_code=404, detail="Task not found")
             return {"success": True, "task_id": task_id}
+
+        # Include WebSocket routes
+        from api.websocket_endpoints import router as ws_router, set_agent_manager
+        self.app.include_router(ws_router)
+
+        # Set agent manager for WebSocket endpoints
+        set_agent_manager(self.agent_manager)
+
+        # Start heartbeat monitor
+        ws_manager = get_websocket_manager()
+        asyncio.create_task(ws_manager.start_heartbeat_monitor())
 
     def _extract_tool_calls(self, request: ChatCompletionRequest) -> List[Dict[str, Any]]:
         """Extract tool calls from the request."""
