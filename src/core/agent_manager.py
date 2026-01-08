@@ -140,27 +140,69 @@ class AgentManager:
             LLM instance or None (will use default)
         """
         model_name = config.llm_model
-
-        # For now, return None to use Qwen Agent's default
-        # In production, you would create proper LLM instances here
-        # based on the model_name and configuration
-
         llm_config = self.config_manager.llm
 
-        # Check if we have an OpenAI-compatible LLM
-        if llm_config.provider == "openai_compatible":
-            # Import Qwen Agent's OpenAI-compatible LLM
-            try:
-                from qwen_agent.llm.schema import DEFAULT_MODEL
-                from qwen_agent.llm.base import BaseChatModel
+        try:
+            from qwen_agent.llm.oai import TextChatAtOAI
 
-                # For simplicity, we'll let Qwen Agent use defaults
-                # In production, you would configure the LLM properly
-                logger.debug(f"[{config.name}] Using OpenAI-compatible LLM: {model_name}")
-                return None  # Let Qwen Agent use default
+            # Find the model configuration
+            model_config = None
+            for model in llm_config.models:
+                if model.name == model_name:
+                    model_config = model
+                    break
 
-            except ImportError:
-                logger.warning(f"Failed to import OpenAI-compatible LLM, using default")
+            if not model_config:
+                logger.warning(f"[{config.name}] Model '{model_name}' not found in LLM config, using default")
+                return None
+
+            # Get provider configuration
+            provider_name = model_config.provider
+            provider_config = llm_config.providers.get(provider_name)
+
+            if not provider_config:
+                logger.warning(f"[{config.name}] Provider '{provider_name}' not found for model '{model_name}'")
+                return None
+
+            # Use model's override settings if available, otherwise use provider's settings
+            api_key = model_config.api_key if model_config.api_key else provider_config.api_key
+            base_url = model_config.base_url if model_config.base_url else provider_config.base_url
+
+            # Handle environment variable substitution
+            if api_key and api_key.startswith("${"):
+                import os
+                env_var = api_key[2:-1]  # Remove ${ and }
+                api_key = os.environ.get(env_var, "")
+                if not api_key:
+                    logger.warning(f"[{config.name}] Environment variable {env_var} not set")
+                    return None
+
+            if not api_key:
+                logger.warning(f"[{config.name}] No API key found for model '{model_name}'")
+                return None
+
+            if not base_url:
+                logger.warning(f"[{config.name}] No base URL found for model '{model_name}'")
+                return None
+
+            logger.debug(f"[{config.name}] Using LLM: {model_name} via provider '{provider_name}'")
+
+            # Create OpenAI-compatible client
+            llm_cfg = {
+                "model": model_name,
+                "api_key": api_key,
+                "base_url": base_url,
+                "generate_config": llm_config.generation.dict() if hasattr(llm_config, 'generation') else {}
+            }
+            llm = TextChatAtOAI(cfg=llm_cfg)
+            return llm
+
+        except ImportError as e:
+            logger.warning(f"[{config.name}] Failed to import LLM modules: {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"[{config.name}] Error configuring LLM: {e}")
+            return None
 
         return None
 

@@ -1,4 +1,4 @@
-# Qwen Agent MCP Scheduler
+# AInTandem Agent MCP Scheduler
 
 A comprehensive local agent infrastructure built with Qwen Agent SDK, featuring MCP server integration, task scheduling, OpenAI-compatible API, Gradio GUI, and dual-edition storage support.
 
@@ -16,39 +16,39 @@ A comprehensive local agent infrastructure built with Qwen Agent SDK, featuring 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Qwen Agent MCP Scheduler                     │
+│                     AInTandem Agent MCP Scheduler               │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │   Gradio    │  │   FastAPI   │  │     CLI     │             │
-│  │     GUI     │  │     API     │  │  Interface  │             │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘             │
-│         │                │                │                      │
-│         └────────────────┴────────────────┘                      │
-│                          │                                       │
-│         ┌────────────────┴────────────────┐                      │
-│         │         Core Components          │                      │
-│         ├──────────────────────────────────┤                      │
-│         │  AgentManager │  TaskScheduler   │                      │
-│         │  MCPBridge    │  SandboxManager  │                      │
-│         │  ConfigManager│  SecurityPolicy  │                      │
-│         └──────────────────────────────────┘                      │
-│                          │                                       │
-│         ┌────────────────┴────────────────┐                      │
-│         │            Agents               │                      │
-│         ├──────────────────────────────────┤                      │
-│         │  Researcher  │  Developer       │                      │
-│         │  Writer      │  Analyst         │                      │
-│         └──────────────────────────────────┘                      │
-│                          │                                       │
-│         ┌────────────────┴────────────────┐                      │
-│         │          MCP Servers            │                      │
-│         ├──────────────────────────────────┤                      │
-│         │  Filesystem  │  Web-Search      │                      │
-│         │  GitHub      │  PostgreSQL       │                      │
-│         │  Google-Maps │  Puppeteer       │                      │
-│         └──────────────────────────────────┘                      │
-│                                                                   │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │   Gradio    │  │   FastAPI   │  │     CLI     │              │
+│  │     GUI     │  │     API     │  │  Interface  │              │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │
+│         │                │                │                     │
+│         └────────────────┴────────────────┘                     │
+│                          │                                      │
+│         ┌────────────────┴────────────────┐                     │
+│         │         Core Components          │                    │
+│         ├──────────────────────────────────┤                    │
+│         │  AgentManager │  TaskScheduler   │                    │
+│         │  MCPBridge    │  SandboxManager  │                    │
+│         │  ConfigManager│  SecurityPolicy  │                    │
+│         └──────────────────────────────────┘                    │
+│                          │                                      │
+│         ┌────────────────┴────────────────┐                     │
+│         │            Agents               │                     │
+│         ├─────────────────────────────────┤                     │
+│         │  Researcher  │  Developer       │                     │
+│         │  Writer      │  Analyst         │                     │
+│         └─────────────────────────────────┘                     │
+│                          │                                      │
+│         ┌────────────────┴────────────────┐                     │
+│         │          MCP Servers            │                     │
+│         ├─────────────────────────────────┤                     │
+│         │  Filesystem  │  Web-Search      │                     │
+│         │  GitHub      │  PostgreSQL      │                     │
+│         │  Google-Maps │  Puppeteer       │                     │
+│         └─────────────────────────────────┘                     │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -417,6 +417,8 @@ agent-infra/
 │   ├── mcp_servers.yaml   # MCP server configs
 │   ├── app.yaml           # Application settings
 │   └── storage.yaml       # Storage & cache configuration
+├── docs/                  # Documentation
+│   └── MCP_TROUBLESHOOTING.md  # MCP server troubleshooting guide
 ├── src/
 │   ├── core/              # Core components
 │   │   ├── config.py      # Configuration management
@@ -460,6 +462,16 @@ agent-infra/
 └── README.md             # This file
 ```
 
+## Troubleshooting
+
+### MCP Server Issues
+
+If you encounter problems with MCP server connections, see [docs/MCP_TROUBLESHOOTING.md](docs/MCP_TROUBLESHOOTING.md) for:
+- Connection timeout issues
+- SDK version compatibility
+- Server-specific problems
+- Common error messages and solutions
+
 ## Dependencies
 
 ### Core Dependencies
@@ -473,7 +485,10 @@ agent-infra/
 
 ### MCP Dependencies
 
-- `mcp` - Model Context Protocol SDK
+- `mcp==1.8.1` - Model Context Protocol SDK
+  - **Important**: Version 1.9.0+ has known issues with `stdio_client` (BrokenResourceError, session initialization hangs)
+  - See: [Issue #1452](https://github.com/modelcontextprotocol/python-sdk/issues/1452), [Issue #1564](https://github.com/modelcontextprotocol/python-sdk/issues/1564)
+  - Use v1.8.1 for stable stdio transport communication
 - `anyio` - Async IO
 
 ### Storage Dependencies

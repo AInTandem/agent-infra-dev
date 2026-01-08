@@ -1,5 +1,5 @@
 """
-Sandbox Environment Manager for Qwen Agent MCP Scheduler.
+Sandbox Environment Manager for AInTandem Agent MCP Scheduler.
 
 Provides execution isolation, resource limits, and security policies.
 """

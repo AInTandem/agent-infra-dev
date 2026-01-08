@@ -17,7 +17,8 @@ agents:
     mcp_servers:
       - "filesystem"
       - "web-search"
-    llm_model: "deepseek-chat"
+    llm_model: "Qwen/Qwen3-7B-Instruct"
+    # 智譜替代方案: glm-4 (標準版，適合研究分析)
     enabled: true
 
   # 開發助手
@@ -36,7 +37,8 @@ agents:
       - "filesystem"
       - "github"
       - "web-search"
-    llm_model: "deepseek-chat"
+    llm_model: "Qwen/Qwen3-14B-Instruct"
+    # 智譜替代方案: glm-4-plus (高品質，適合複雜程式開發)
     enabled: true
 
   # 寫作助理
@@ -53,7 +55,8 @@ agents:
       請根據目標受眾調整寫作風格，確保內容引人入勝。
     mcp_servers:
       - "filesystem"
-    llm_model: "deepseek-chat"
+    llm_model: "Qwen/Qwen3-7B-Instruct"
+    # 智譜替代方案: glm-4-air (經濟實惠，適合文本生成)
     enabled: true
 
   # 數據分析師
@@ -71,5 +74,6 @@ agents:
     mcp_servers:
       - "filesystem"
       - "postgres"  # 需要配置
-    llm_model: "gpt-4o"
+    llm_model: "Qwen/Qwen3-32B-Instruct"
+    # 智譜替代方案: glm-4-plus (高品質，適合複雜數據分析)
     enabled: false  # 預設停用，需要配置後啟用

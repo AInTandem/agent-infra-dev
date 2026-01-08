@@ -1,5 +1,5 @@
 """
-Resource Limiter for Qwen Agent MCP Scheduler.
+Resource Limiter for AInTandem Agent MCP Scheduler.
 
 Provides resource monitoring and limiting capabilities.
 """

@@ -1,40 +1,179 @@
 # LLM Configuration
-# 支援多種 LLM 提供商
+# Provider -> Model 層級結構
+# 每個 Provider 有預設的 API Key 和 Base URL
+# 每個 Model 可以選擇 Provider，並可選擇性地覆蓋 API Key/Base URL
 
 llm:
-  # 提供商類型: openai_compatible, openai, dashscope
-  provider: "openai_compatible"
+  # ============================================================================
+  # Providers (全域認證設定)
+  # ============================================================================
+  providers:
+    modelscope:
+      description: ModelScope (魔搭社區) - 個人開源社群推薦
+      api_key: ${MODELSCOPE_API_TOKEN}
+      base_url: https://api-inference.modelscope.cn/v1
+      # 獲取訪問令牌: https://modelscope.cn/my/myaccesstoken
+      # API 文檔: https://api-inference.modelscope.cn/docs
 
-  # API 設定
-  api_key: "${DEEPSEEK_API_KEY}"  # 從環境變數讀取
-  base_url: "https://api.deepseek.com/v1"
+    deepseek:
+      description: DeepSeek - 高性價比替代方案
+      api_key: ${DEEPSEEK_API_KEY}
+      base_url: https://api.deepseek.com/v1
 
-  # 預設模型
-  default_model: "deepseek-chat"
+    dashscope:
+      description: DashScope (阿里雲靈積) - 商業用戶使用
+      api_key: ${DASHSCOPE_API_KEY}
+      base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
 
-  # 可用模型列表
-  models:
-    - name: "deepseek-chat"
-      provider: "deepseek"
-      max_tokens: 4096
-      supports_streaming: true
-      supports_function_calling: true
+    openai:
+      description: OpenAI - 高品質方案
+      api_key: ${OPENAI_API_KEY}
+      base_url: https://api.openai.com/v1
 
-    - name: "gpt-4o"
-      provider: "openai"
-      max_tokens: 4096
-      supports_streaming: true
-      supports_function_calling: true
+    z-ai:
+      description: Z AI (智譜) - GLM 系列模型
+      api_key: ${ZAI_API_KEY}
+      base_url: https://api.z.ai/api/paas/v4
+      # API 文檔: https://open.bigmodel.cn/dev/api
 
-    - name: "qwen-max"
-      provider: "dashscope"
-      max_tokens: 8192
-      supports_streaming: true
-      supports_function_calling: true
+    ollama:
+      description: Ollama - 本地開發
+      api_key: ""
+      base_url: http://localhost:11434/v1
 
-  # 生成參數
+  # ============================================================================
+  # 全域生成設定
+  # ============================================================================
   generation:
     temperature: 0.7
     top_p: 0.9
     max_retries: 3
     timeout: 60
+
+  # ============================================================================
+  # 預設模型
+  # ============================================================================
+  default_model: Qwen/Qwen3-7B-Instruct
+
+  # ============================================================================
+  # Models 列表 (每個模型關聯到一個 Provider)
+  # ============================================================================
+  models:
+  # Qwen3 模型（推薦給個人開源社群）
+  - name: Qwen/Qwen3-7B-Instruct
+    provider: modelscope
+    description: Qwen3-7B - 平衡型，適合多數場景
+    max_tokens: 32768
+    supports_function_calling: true
+    supports_streaming: true
+
+  - name: Qwen/Qwen3-14B-Instruct
+    provider: modelscope
+    description: Qwen3-14B - 高質量，適合複雜任務
+    max_tokens: 32768
+    supports_function_calling: true
+    supports_streaming: true
+
+  - name: Qwen/Qwen3-32B-Instruct
+    provider: modelscope
+    description: Qwen3-32B - 高質量，適合複雜推理
+    max_tokens: 32768
+    supports_function_calling: true
+    supports_streaming: true
+
+  # Qwen2.5 模型（備用）
+  - name: Qwen/Qwen2.5-7B-Instruct
+    provider: modelscope
+    description: Qwen2.5-7B - 平衡型，適合多數場景
+    max_tokens: 32768
+    supports_function_calling: true
+    supports_streaming: true
+
+  - name: Qwen/Qwen2.5-14B-Instruct
+    provider: modelscope
+    description: Qwen2.5-14B - 輕量高效
+    max_tokens: 32768
+    supports_function_calling: true
+    supports_streaming: true
+
+  - name: Qwen/Qwen2.5-32B-Instruct
+    provider: modelscope
+    description: Qwen2.5-32B - 介於 7B 和 72B 之間
+    max_tokens: 32768
+    supports_function_calling: true
+    supports_streaming: true
+
+  - name: Qwen/Qwen2.5-72B-Instruct
+    provider: modelscope
+    description: Qwen2.5-72B - 高質量
+    max_tokens: 32768
+    supports_function_calling: true
+    supports_streaming: true
+
+  - name: Qwen/Qwen2.5-3B-Instruct
+    provider: modelscope
+    description: Qwen2.5-3B - 超輕量，適合邊緣設備
+    max_tokens: 32768
+    supports_function_calling: true
+    supports_streaming: true
+
+  # DashScope (阿里雲靈積) - 商業用戶使用
+  - name: qwen-plus
+    provider: dashscope
+    description: 通義千問+ - DashScope 雲端服務
+    max_tokens: 32768
+    supports_function_calling: true
+    supports_streaming: true
+
+  # DeepSeek (低成本替代方案)
+  - name: deepseek-chat
+    provider: deepseek
+    description: DeepSeek - 高性價比
+    max_tokens: 4096
+    supports_function_calling: true
+    supports_streaming: true
+
+  # OpenAI (高品質方案)
+  - name: gpt-4o
+    provider: openai
+    description: GPT-4o - OpenAI 最新模型
+    max_tokens: 4096
+    supports_function_calling: true
+    supports_streaming: true
+
+  # Ollama (本地開發)
+  - name: llama3.2
+    provider: ollama
+    description: Llama 3.2 - 本地運行
+    max_tokens: 8192
+    supports_function_calling: true
+    supports_streaming: true
+
+  # Z AI (智譜) - GLM 系列模型
+  - name: glm-4-flash
+    provider: z-ai
+    description: GLM-4 Flash - 入門級，快速響應，適合簡單任務
+    max_tokens: 128000
+    supports_function_calling: true
+    supports_streaming: true
+
+  - name: glm-4-air
+    provider: z-ai
+    description: GLM-4 Air - 經濟實惠，平衡性能與成本
+    max_tokens: 128000
+    supports_function_calling: true
+    supports_streaming: true
+
+  - name: glm-4
+    provider: z-ai
+    description: GLM-4 - 標準版，適合多數場景
+    max_tokens: 128000
+    supports_function_calling: true
+    supports_streaming: true
+
+  - name: glm-4-plus
+    provider: z-ai
+    description: GLM-4 Plus - 高品質，適合複雜推理與程式開發
+    max_tokens: 128000
+    supports_function_calling: true
+    supports_streaming: true

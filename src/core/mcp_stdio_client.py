@@ -85,40 +85,48 @@ class MCPStdioClient:
             # Connect and initialize session within the context
             async def _connect_and_initialize():
                 async with stdio_ctx as (read_stream, write_stream):
-                    # Create client session with the streams
-                    session = ClientSession(read_stream, write_stream)
+                    logger.debug(f"[{self.name}] stdio context established, creating session...")
 
-                    # Initialize the session
-                    await session.initialize()
+                    # Use ClientSession as context manager (auto-initializes)
+                    async with ClientSession(read_stream, write_stream) as session:
+                        logger.debug(f"[{self.name}] Session initialized successfully")
 
-                    # Store session
-                    self._session = session
+                        # Store session
+                        self._session = session
 
-                    # Get server capabilities
-                    capabilities = session.get_server_capabilities()
-                    self._server_capabilities = {
-                        "tools": bool(capabilities.tools),
-                        "resources": bool(capabilities.resources),
-                        "prompts": bool(capabilities.prompts),
-                    }
+                        # Probe server capabilities by testing each feature
+                        try:
+                            await asyncio.wait_for(session.list_tools(), timeout=2)
+                            self._server_capabilities = {"tools": True, "resources": False, "prompts": False}
+                            logger.debug(f"[{self.name}] Server supports tools")
+                        except asyncio.TimeoutError:
+                            self._server_capabilities = {"tools": False, "resources": False, "prompts": False}
+                            logger.warning(f"[{self.name}] Could not probe server capabilities")
 
-                    self._is_connected = True
-                    logger.info(f"[{self.name}] Connected successfully")
-                    logger.debug(f"[{self.name}] Server capabilities: {self._server_capabilities}")
+                        self._is_connected = True
+                        logger.info(f"[{self.name}] Connected successfully")
+                        logger.debug(f"[{self.name}] Server capabilities: {self._server_capabilities}")
 
-                    # Wait until we should stop
-                    await self._should_stop.wait()
+                        # Wait until we should stop
+                        await self._should_stop.wait()
 
             # Run the connection in a background task
             self._keep_alive_task = asyncio.create_task(_connect_and_initialize())
 
-            # Wait for connection to be established
-            for _ in range(50):  # Wait up to 5 seconds
-                await asyncio.sleep(0.1)
+            # Wait for connection to be established (use configured timeout)
+            max_wait = self.timeout  # Use the configured timeout value
+            wait_interval = 0.1  # Check every 100ms
+            max_attempts = int(max_wait / wait_interval)
+
+            logger.debug(f"[{self.name}] Waiting for connection (timeout: {max_wait}s)...")
+
+            for attempt in range(max_attempts):
+                await asyncio.sleep(wait_interval)
                 if self._is_connected:
+                    logger.debug(f"[{self.name}] Connected after {attempt * wait_interval:.1f}s")
                     break
             else:
-                raise TimeoutError(f"[{self.name}] Connection timeout")
+                raise TimeoutError(f"[{self.name}] Connection timeout after {max_wait}s")
 
         except Exception as e:
             logger.error(f"[{self.name}] Failed to connect: {e}")

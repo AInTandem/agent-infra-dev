@@ -7,8 +7,9 @@ Provides type-safe configuration loading with environment variable substitution.
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+from loguru import logger
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -37,6 +38,29 @@ def substitute_env(value: str) -> str:
     return re.sub(pattern, replacer, value)
 
 
+def substitute_env_with_tracking(value: str) -> Tuple[str, List[Tuple[str, str]]]:
+    """
+    Substitute environment variables in string values and track substitutions.
+
+    Args:
+        value: String value potentially containing environment variables
+
+    Returns:
+        Tuple of (substituted_value, list of (var_name, var_value) substitutions)
+    """
+    substitutions = []
+
+    def replacer(match: re.Match) -> str:
+        var_name = match.group(1) or match.group(2)
+        var_value = os.environ.get(var_name, match.group(0))
+        substitutions.append((var_name, var_value))
+        return var_value
+
+    pattern = r'\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}|\$([a-zA-Z_][a-zA-Z0-9_]*)'
+    result = re.sub(pattern, replacer, value)
+    return result, substitutions
+
+
 def substitute_env_recursive(data: Any) -> Any:
     """
     Recursively substitute environment variables in data structures.
@@ -57,17 +81,75 @@ def substitute_env_recursive(data: Any) -> Any:
         return data
 
 
+def substitute_env_recursive_with_tracking(data: Any, path: str = "") -> Tuple[Any, List[Tuple[str, str, str]]]:
+    """
+    Recursively substitute environment variables with tracking.
+
+    Args:
+        data: Any data structure (dict, list, str, etc.)
+        path: Current path in the data structure (for logging)
+
+    Returns:
+        Tuple of (substituted_data, list of (path, var_name, var_value) substitutions)
+    """
+    all_substitutions = []
+
+    if isinstance(data, dict):
+        result = {}
+        for key, value in data.items():
+            new_path = f"{path}.{key}" if path else key
+            new_value, subs = substitute_env_recursive_with_tracking(value, new_path)
+            result[key] = new_value
+            all_substitutions.extend(subs)
+        return result, all_substitutions
+
+    elif isinstance(data, list):
+        result = []
+        for i, item in enumerate(data):
+            new_path = f"{path}[{i}]"
+            new_value, subs = substitute_env_recursive_with_tracking(item, new_path)
+            result.append(new_value)
+            all_substitutions.extend(subs)
+        return result, all_substitutions
+
+    elif isinstance(data, str):
+        substituted, subs = substitute_env_with_tracking(data)
+        for var_name, var_value in subs:
+            all_substitutions.append((path, var_name, var_value))
+        return substituted, all_substitutions
+
+    else:
+        return data, all_substitutions
+
+
 # ============================================================================
 # LLM Configuration Models
 # ============================================================================
+
+class LLMProviderConfig(BaseModel):
+    """Configuration for an LLM provider."""
+    description: str = ""
+    api_key: str = ""
+    base_url: str = ""
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LLMProviderConfig":
+        """Create LLMProviderConfig from dictionary with env var substitution."""
+        data = substitute_env_recursive(data)
+        return cls(**data)
+
 
 class LLMModelConfig(BaseModel):
     """Configuration for a specific LLM model."""
     name: str
     provider: str
+    description: str = ""
     max_tokens: int = 4096
     supports_streaming: bool = True
     supports_function_calling: bool = True
+    # Optional override fields
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
 
 
 class LLMGenerationConfig(BaseModel):
@@ -86,11 +168,9 @@ class LLMGenerationConfig(BaseModel):
 
 
 class LLMConfig(BaseModel):
-    """LLM provider configuration."""
-    provider: str = "openai_compatible"
-    api_key: str = ""
-    base_url: str = ""
-    default_model: str = "deepseek-chat"
+    """LLM configuration with provider-model hierarchy."""
+    providers: Dict[str, LLMProviderConfig] = Field(default_factory=dict)
+    default_model: str = "Qwen/Qwen3-7B-Instruct"
     models: List[LLMModelConfig] = Field(default_factory=list)
     generation: LLMGenerationConfig = Field(default_factory=LLMGenerationConfig)
 
@@ -98,7 +178,27 @@ class LLMConfig(BaseModel):
     def from_dict(cls, data: Dict[str, Any]) -> "LLMConfig":
         """Create LLMConfig from dictionary with env var substitution."""
         data = substitute_env_recursive(data)
-        return cls(**data)
+
+        # Handle providers dict
+        providers_data = data.get("providers", {})
+        providers = {}
+        for provider_name, provider_config in providers_data.items():
+            providers[provider_name] = LLMProviderConfig.from_dict(provider_config)
+
+        # Handle models list
+        models_data = data.get("models", [])
+        models = [LLMModelConfig(**model) for model in models_data]
+
+        # Handle generation config
+        generation_data = data.get("generation", {})
+        generation = LLMGenerationConfig(**generation_data) if generation_data else LLMGenerationConfig()
+
+        return cls(
+            providers=providers,
+            default_model=data.get("default_model", "Qwen/Qwen3-7B-Instruct"),
+            models=models,
+            generation=generation,
+        )
 
 
 # ============================================================================
@@ -125,8 +225,39 @@ class MCPServerConfig(BaseModel):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MCPServerConfig":
         """Create MCPServerConfig from dictionary with env var substitution."""
-        data = substitute_env_recursive(data)
-        return cls(**data)
+        server_name = data.get("name", "unknown")
+
+        # Use tracking version to log environment variable substitutions
+        substituted_data, substitutions = substitute_env_recursive_with_tracking(data)
+
+        if substitutions:
+            logger.debug(f"[MCP Server: {server_name}] Environment variable substitutions:")
+            for path, var_name, var_value in substitutions:
+                # Mask sensitive values
+                display_value = "***" if any(keyword in var_name.upper() for keyword in ["KEY", "TOKEN", "PASSWORD", "SECRET"]) else var_value
+                logger.debug(f"  {path} → ${{{var_name}}} = \"{display_value}\"")
+        else:
+            logger.debug(f"[MCP Server: {server_name}] No environment variables to substitute")
+
+        # Create the config instance
+        config = cls(**substituted_data)
+
+        # Display the actual command that will be executed
+        command_parts = [config.command] + config.args
+        # Mask sensitive values in args for display
+        display_parts = []
+        for part in command_parts:
+            # Check if this part is a sensitive value (contains actual sensitive data)
+            is_sensitive = False
+            for path, var_name, var_value in substitutions:
+                if part == var_value and any(keyword in var_name.upper() for keyword in ["KEY", "TOKEN", "PASSWORD", "SECRET"]):
+                    is_sensitive = True
+                    break
+            display_parts.append("***" if is_sensitive else part)
+
+        logger.debug(f"[MCP Server: {server_name}] Command: {' '.join(display_parts)}")
+
+        return config
 
 
 # ============================================================================
@@ -204,7 +335,7 @@ class AgentSystemConfig(BaseModel):
 
 class AppConfig(BaseModel):
     """Main application configuration."""
-    name: str = "Qwen Agent MCP Scheduler"
+    name: str = "AInTandem Agent MCP Scheduler"
     version: str = "0.1.0"
     debug: bool = False
     server: ServerConfig = Field(default_factory=ServerConfig)

@@ -1,4 +1,4 @@
-# Storage Configuration for Qwen Agent MCP Scheduler
+# Storage Configuration for AInTandem Agent MCP Scheduler
 
 # Select the storage type: sqlite (personal) or postgresql (enterprise)
 storage:

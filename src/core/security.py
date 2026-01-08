@@ -1,5 +1,5 @@
 """
-Security Policies for Qwen Agent MCP Scheduler.
+Security Policies for AInTandem Agent MCP Scheduler.
 
 Provides security validation, sanitization, and policy enforcement.
 """

@@ -2,7 +2,9 @@
 qwen-agent>=0.0.25
 
 # MCP SDK
-mcp>=0.9.0
+# NOTE: v1.9.0+ has known issues with stdio_client (BrokenResourceError)
+# Using v1.8.1 as recommended fix: https://github.com/modelcontextprotocol/python-sdk/issues/1452
+mcp==1.8.1
 
 # Task Scheduling
 apscheduler>=3.10.0
