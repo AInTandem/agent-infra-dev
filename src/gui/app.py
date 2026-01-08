@@ -35,6 +35,7 @@ from core.config import ConfigManager
 from core.task_scheduler import TaskScheduler
 from core.task_models import ScheduleType
 from gui.config_editor import ConfigEditor
+from gui.websocket_chat import WebSocketChatComponent
 
 
 class GradioApp:
@@ -69,6 +70,12 @@ class GradioApp:
         # Initialize config editor
         self.config_editor = ConfigEditor(config_manager)
 
+        # Initialize WebSocket chat component
+        self.ws_chat = WebSocketChatComponent(
+            api_host="localhost",
+            api_port=8000
+        )
+
         # Create Gradio interface
         self.app = self._create_interface()
 
@@ -79,9 +86,13 @@ class GradioApp:
             gr.Markdown("# 🤖 AInTandem Agent MCP Scheduler")
 
             with gr.Tabs():
-                # Tab 1: Chat
+                # Tab 1: Chat (Original)
                 with gr.Tab("💬 Chat"):
                     self._create_chat_tab()
+
+                # Tab 1.5: Real-Time Chat (WebSocket Streaming)
+                with gr.Tab("⚡ Real-Time Chat"):
+                    self._create_realtime_chat_tab()
 
                 # Tab 2: Tasks
                 with gr.Tab("⏰ Tasks"):
@@ -151,6 +162,36 @@ class GradioApp:
             fn=self._clear_chat_history,
             outputs=[history_output]
         )
+
+    def _create_realtime_chat_tab(self):
+        """Create the real-time streaming chat interface tab."""
+        gr.Markdown("### ⚡ Real-Time Streaming Chat")
+        gr.Markdown("""
+        **WebSocket-based real-time agent chat with streaming reasoning display.**
+
+        Features:
+        - See each reasoning step as it's generated
+        - Real-time tool use visualization
+        - Color-coded step types (thoughts, tool use, results)
+        - Auto-reconnect on disconnect
+        """)
+
+        # Add the WebSocket chat component
+        self.ws_chat.create_interface()
+
+        # Add custom JavaScript
+        gr.HTML(f"""
+        <script>
+        {self.ws_chat.get_custom_js()}
+        </script>
+        """)
+
+        # Add custom CSS
+        gr.HTML(f"""
+        <style>
+        {self.ws_chat.get_custom_css()}
+        </style>
+        """)
 
     def _create_agents_tab(self):
         """Create the agents management tab."""
