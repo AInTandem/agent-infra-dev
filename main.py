@@ -1,4 +1,24 @@
 #!/usr/bin/env python3
+# Copyright (c) 2025 AInTandem
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Main entry point for AInTandem Agent MCP Scheduler.
 
@@ -7,9 +27,11 @@ This application provides:
 - Task scheduling capabilities
 - OpenAI-compatible API
 - Gradio web interface
+- Hot reload for configuration changes (development mode)
 """
 
 import asyncio
+import os
 import signal
 import sys
 from pathlib import Path
@@ -27,6 +49,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from api.openapi_server import create_api_server
 from core.agent_manager import AgentManager
 from core.config import ConfigManager
+from core.hot_reload import HotReloadManager
 from core.mcp_bridge import MCPBridge
 from core.storage_helpers import create_adapters_from_config
 from core.task_scheduler import TaskScheduler
@@ -48,7 +71,12 @@ class Application:
         self.cache_adapter = None
         self.api_server = None
         self.gradio_app = None
+        self.hot_reload: HotReloadManager = None
         self._running = False
+
+    def _is_hot_reload_enabled(self) -> bool:
+        """Check if hot reload is enabled via environment variable."""
+        return os.environ.get("HOT_RELOAD_ENABLED", "false").lower() in ("true", "1", "yes", "on")
 
     async def initialize(self):
         """Initialize all components."""
@@ -116,6 +144,96 @@ class Application:
 
         console.print("\n[bold green]All components initialized successfully![/bold green]\n")
 
+        # Initialize Hot Reload (if enabled)
+        if self._is_hot_reload_enabled():
+            await self._initialize_hot_reload()
+        else:
+            console.print("[dim]Hot reload disabled (set HOT_RELOAD_ENABLED=true to enable)[/dim]\n")
+
+    async def _initialize_hot_reload(self):
+        """Initialize hot reload for configuration changes."""
+        console.print("[dim]8/8. Initializing Hot Reload...[/dim]")
+
+        self.hot_reload = HotReloadManager(
+            config_dir="config",
+            src_dir="src",
+            check_interval=1.0,
+        )
+
+        # Monitor config files
+        self.hot_reload.monitor_files([
+            "agents.yaml",
+            "llm.yaml",
+            "mcp_servers.yaml",
+            "app.yaml",
+            "storage.yaml",
+        ])
+
+        # Monitor source code files
+        self.hot_reload.monitor_code(["**/*.py"])
+
+        # Register reload handlers
+        self.hot_reload.register_handler("agents.yaml", self._reload_agents)
+        self.hot_reload.register_handler("llm.yaml", self._reload_agents)
+        self.hot_reload.register_handler("mcp_servers.yaml", self._reload_mcp_servers)
+        self.hot_reload.register_handler("app.yaml", self._reload_config)
+        self.hot_reload.register_handler("storage.yaml", self._reload_config)
+
+        # Register restart callback for code changes
+        self.hot_reload.register_restart_callback(self._restart_application)
+
+        # Start monitoring
+        await self.hot_reload.start()
+
+        console.print("[green]✓[/green] Hot reload enabled")
+        console.print("[dim]  Watching: config/*.yaml, src/**/*.py[/dim]")
+
+    async def _reload_agents(self):
+        """Reload agents when configuration changes."""
+        console.print("\n[yellow]Reloading agents...[/yellow]")
+
+        # Reload configuration
+        self.config_manager.reload()
+        self.config_manager.load_agents()
+
+        # Reload agent manager
+        count = await self.agent_manager.reload_all()
+
+        console.print(f"[green]✓[/green] Reloaded {count} agents")
+
+    async def _reload_mcp_servers(self):
+        """Reload MCP servers when configuration changes."""
+        console.print("\n[yellow]Reloading MCP servers...[/yellow]")
+
+        # Note: Full MCP server reload requires restarting the application
+        # For now, just log a message
+        console.print("[yellow]⚠[/yellow] MCP server changes require application restart")
+        logger.warning("MCP server configuration changed - restart required")
+
+    async def _reload_config(self):
+        """Reload general configuration."""
+        console.print("\n[yellow]Reloading configuration...[/yellow]")
+
+        # Reload configuration
+        self.config_manager.reload()
+
+        console.print("[green]✓[/green] Configuration reloaded")
+
+    async def _restart_application(self):
+        """Restart the application when code changes."""
+        logger.info("Restarting application due to code changes...")
+
+        # Stop all services
+        await self.stop()
+
+        # Short delay to ensure clean shutdown
+        import asyncio
+        await asyncio.sleep(1)
+
+        # Re-initialize and start
+        await self.initialize()
+        await self.start()
+
     async def start(self):
         """Start all services."""
         self._running = True
@@ -173,6 +291,10 @@ class Application:
             return
 
         console.print("\n[yellow]Shutting down...[/yellow]")
+
+        # Stop hot reload
+        if self.hot_reload:
+            await self.hot_reload.stop()
 
         # Stop task scheduler
         if self.task_scheduler:

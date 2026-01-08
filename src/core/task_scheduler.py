@@ -1,3 +1,23 @@
+# Copyright (c) 2025 AInTandem
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Task Scheduler implementation using APScheduler.
 
@@ -263,14 +283,33 @@ class TaskScheduler:
             if not agent:
                 raise ValueError(f"Agent not found: {task.agent_name}")
 
-            # Execute agent
-            response = await agent.run_async(task.task_prompt)
+            # Execute agent with continuous reasoning
+            reasoning_steps = await agent.run_with_reasoning(task.task_prompt)
 
-            # Extract result
-            result = ""
-            for msg in response:
-                if msg.role == "assistant":
-                    result += msg.content or ""
+            # Format reasoning steps into result
+            result_parts = []
+            for step in reasoning_steps:
+                step_type = step.get("type", "unknown")
+
+                if step_type == "thought":
+                    content = step.get("content", "")
+                    if content and content.strip():
+                        result_parts.append(f"[Thinking] {content}")
+
+                elif step_type == "tool_use":
+                    tool_name = step.get("tool_name", "unknown")
+                    content = step.get("content", "")
+                    result_parts.append(f"[Tool: {tool_name}] {content}")
+
+                elif step_type == "tool_result":
+                    tool_name = step.get("tool_name", "unknown")
+                    content = step.get("content", "")
+                    # Truncate long results
+                    if content and len(content) > 1000:
+                        content = content[:1000] + "...[truncated]"
+                    result_parts.append(f"[Result from {tool_name}]\n{content}")
+
+            result = "\n\n".join(result_parts) if result_parts else "No reasoning steps generated"
 
             # Mark as completed
             task.mark_completed(result)

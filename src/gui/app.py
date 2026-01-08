@@ -1,3 +1,23 @@
+# Copyright (c) 2025 AInTandem
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
 Gradio GUI for AInTandem Agent MCP Scheduler.
 
@@ -95,10 +115,17 @@ class GradioApp:
                     interactive=True
                 )
 
+                # Reasoning mode toggle
+                reasoning_toggle = gr.Checkbox(
+                    label="Enable Continuous Reasoning",
+                    value=True,
+                    info="Agent will use tools and think step-by-step"
+                )
+
                 # Chat interface - Gradio 6.0+ compatible
                 chat_interface = gr.ChatInterface(
                     fn=self._chat_with_agent,
-                    additional_inputs=[agent_dropdown],
+                    additional_inputs=[agent_dropdown, reasoning_toggle],
                     examples=[
                         ["Hello! How can you help me?"],
                         ["搜索最近的 AI 論文"],
@@ -262,31 +289,146 @@ class GradioApp:
         self,
         message: str,
         history: List[Tuple[str, str]],
-        agent_name: str
-    ) -> str:
-        """Chat with an agent."""
+        agent_name: str,
+        enable_reasoning: bool = True
+    ):
+        """Chat with an agent - supports streaming for reasoning mode."""
         try:
             agent = self.agent_manager.get_agent(agent_name)
             if not agent:
-                return f"Error: Agent '{agent_name}' not found"
+                yield f"Error: Agent '{agent_name}' not found"
+                return
 
-            # Run agent
+            # Run agent with proper async handling
             import asyncio
-            response = asyncio.run(agent.run_async(message))
 
-            # Extract response
-            content = ""
-            for msg in response:
-                if hasattr(msg, 'content') and msg.content:
-                    content += msg.content
-                elif isinstance(msg, dict):
-                    content += msg.get('content', '')
+            def run_async(coro):
+                """Helper to run async code in Gradio context."""
+                try:
+                    loop = asyncio.get_running_loop()
+                    # There's already a running loop, use create_task
+                    import concurrent.futures
+                    import threading
 
-            return content if content else "No response generated"
+                    result_holder = []
+                    exception_holder = []
+
+                    def run_in_new_loop():
+                        try:
+                            new_loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(new_loop)
+                            try:
+                                result = new_loop.run_until_complete(coro)
+                                result_holder.append(result)
+                            finally:
+                                new_loop.close()
+                        except Exception as e:
+                            exception_holder.append(e)
+
+                    thread = threading.Thread(target=run_in_new_loop)
+                    thread.start()
+                    thread.join(timeout=120)  # 2 minute timeout
+
+                    if exception_holder:
+                        raise exception_holder[0]
+                    if not result_holder:
+                        raise TimeoutError("Agent call timed out after 120 seconds")
+
+                    return result_holder[0]
+                except RuntimeError:
+                    # No running loop, safe to use asyncio.run
+                    return asyncio.run(coro)
+
+            if enable_reasoning:
+                # Use continuous reasoning mode with streaming
+                logger.info(f"[GUI] Running agent '{agent_name}' with reasoning (streaming)")
+
+                # Yield initial status
+                yield "🤔 Agent is thinking...\n\n"
+
+                reasoning_steps = run_async(agent.run_with_reasoning(message))
+
+                # Debug: Dump reasoning steps structure
+                logger.info(f"[GUI DEBUG] Received {len(reasoning_steps)} reasoning steps")
+                for i, step in enumerate(reasoning_steps):
+                    step_type = step.get("type", "unknown")
+                    content = step.get("content", "")
+                    tool_name = step.get("tool_name", "")
+                    logger.info(f"[GUI DEBUG] Step {i}: type={step_type}, tool_name={tool_name}, content_len={len(content)}, content_preview={repr(content[:100] if content else '')}")
+
+                # Stream reasoning steps
+                output_parts = ["🤔 Agent is thinking...\n\n"]
+
+                for step in reasoning_steps:
+                    step_type = step.get("type", "unknown")
+
+                    if step_type == "thought":
+                        # Agent's thinking process
+                        content = step.get("content", "")
+                        if content and content.strip():
+                            formatted = f"🤔 **Thinking:**\n{content}"
+                            output_parts.append(formatted)
+                            # Stream current progress
+                            yield "\n\n".join(output_parts) + "\n\n*...continuing to think...*"
+
+                    elif step_type == "final_answer":
+                        # Final answer from agent
+                        content = step.get("content", "")
+                        if content and content.strip():
+                            formatted = f"\n\n✅ **Final Answer:**\n{content}"
+                            output_parts.append(formatted)
+                            # Stream final result
+                            yield "\n\n".join(output_parts)
+
+                    elif step_type == "tool_use":
+                        # Agent decided to use a tool
+                        tool_name = step.get("tool_name", "unknown")
+                        content = step.get("content", "")
+                        formatted = f"\n\n🔧 **Using tool:** `{tool_name}`"
+                        if content and content.strip():
+                            formatted += f"\n_{content}_"
+                        output_parts.append(formatted)
+                        # Stream tool use
+                        yield "\n\n".join(output_parts)
+
+                    elif step_type == "tool_result":
+                        # Tool execution result
+                        tool_name = step.get("tool_name", "unknown")
+                        content = step.get("content", "")
+                        # Truncate long results
+                        if content and len(content) > 500:
+                            content = content[:500] + "...\n[Result truncated]"
+                        formatted = f"\n\n📊 **Result from `{tool_name}`:**\n```\n{content}\n```"
+                        output_parts.append(formatted)
+                        # Stream tool result
+                        yield "\n\n".join(output_parts)
+
+                # Final yield with complete result
+                result = "\n\n".join(output_parts)
+                logger.info(f"[GUI] Final result with {len(output_parts)} parts")
+                yield result
+
+            else:
+                # Simple mode without reasoning - also support streaming
+                logger.info(f"[GUI] Running agent '{agent_name}' without reasoning")
+                yield "🤔 Processing...\n\n"
+
+                response = run_async(agent.run_async(message))
+
+                # Extract response
+                content = ""
+                for msg in response:
+                    if hasattr(msg, 'content') and msg.content:
+                        content += msg.content
+                    elif isinstance(msg, dict):
+                        content += msg.get('content', '')
+
+                result = content if content else "No response generated"
+                yield result
 
         except Exception as e:
             logger.exception(f"Error in chat with agent '{agent_name}'")
-            return f"Error: {str(e)}"
+            yield f"Error: {str(e)}"
 
     def _clear_chat_history(self) -> str:
         """Clear chat history."""
@@ -1098,11 +1240,12 @@ class GradioApp:
         )
 
         save_agent_btn.click(
-            fn=lambda n, r, d, sp, lm, ms, e: (
+            fn=lambda sel, n, r, d, sp, lm, ms, e: (
+                self.config_editor.update_agent(sel, n, r, d, sp, convert_display_to_model_name(lm), ms, e) if sel and n else
                 self.config_editor.add_agent(n, r, d, sp, convert_display_to_model_name(lm), ms, e) if n else "❌ Agent name is required",
                 *update_pending_info()
             ),
-            inputs=[agent_name, agent_role, agent_description, agent_system_prompt,
+            inputs=[selected_agent, agent_name, agent_role, agent_description, agent_system_prompt,
                    agent_llm_model, agent_mcp_servers, agent_enabled],
             outputs=[agents_status, pending_info, pending_count]
         )
@@ -1182,11 +1325,12 @@ class GradioApp:
         )
 
         save_mcp_btn.click(
-            fn=lambda n, d, c, a, e, t, en, hc, hi: (
+            fn=lambda sel, n, d, c, a, e, t, en, hc, hi: (
+                self.config_editor.update_mcp_server(sel, n, d, c, a, e, t, en, hc, hi) if sel and n else
                 self.config_editor.add_mcp_server(n, d, c, a, e, t, en, hc, hi) if n else "❌ Server name is required",
                 *update_pending_info()
             ),
-            inputs=[mcp_name, mcp_description, mcp_command, mcp_args, mcp_env,
+            inputs=[selected_mcp_server, mcp_name, mcp_description, mcp_command, mcp_args, mcp_env,
                    mcp_timeout, mcp_enabled, mcp_health_check, mcp_health_interval],
             outputs=[mcp_status, pending_info, pending_count]
         )
