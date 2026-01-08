@@ -439,6 +439,171 @@ class BaseAgent:
             logger.error(f"[{self.name}] Error running agent with reasoning: {e}")
             raise
 
+    async def run_with_reasoning_stream(
+        self,
+        prompt: str,
+        session_id: Optional[str] = None,
+        max_iterations: int = 20,
+        **kwargs
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """
+        Run the agent with continuous reasoning (multi-step tool use) - Streaming version.
+
+        This is an async generator that yields reasoning steps as they are generated,
+        allowing for real-time display of the agent's thought process.
+
+        Yields:
+            Dict[str, Any]: Reasoning step containing:
+            - type: "thought" or "tool_use" or "tool_result" or "final_answer"
+            - content: The content of the step
+            - tool_name: Tool name (for tool_use/tool_result steps)
+            - iteration: Iteration number
+            - timestamp: Unix timestamp when the step was generated
+
+        Args:
+            prompt: User prompt
+            session_id: Optional session ID for multi-turn conversations
+            max_iterations: Maximum number of reasoning iterations
+            **kwargs: Additional arguments for the agent
+        """
+        import time
+
+        logger.info(f"[{self.name}] Running agent with reasoning stream: {prompt[:50]}...")
+
+        self._total_runs += 1
+
+        # Create message
+        message = Message(
+            role="user",
+            content=prompt,
+        )
+
+        # Add to history
+        self._add_to_history(message)
+
+        iteration = 0
+
+        try:
+            import asyncio
+            from qwen_agent.llm.schema import FUNCTION
+
+            # Manual ReAct loop with streaming
+            while iteration < max_iterations:
+                iteration += 1
+                logger.debug(f"[{self.name}] Reasoning iteration {iteration}/{max_iterations}")
+
+                # Run the agent (non-streaming) for one step
+                # Note: Qwen Agent doesn't support true streaming in the ReAct loop,
+                # so we stream at the iteration level
+                response = await asyncio.to_thread(
+                    self._assistant.run_nonstream,
+                    messages=self._history,
+                    **kwargs
+                )
+
+                if not response:
+                    logger.warning(f"[{self.name}] Empty response at iteration {iteration}")
+                    break
+
+                # Process messages from this iteration
+                tool_used_this_iteration = False
+                assistant_message = None
+
+                for msg in response:
+                    if isinstance(msg, dict):
+                        msg = Message(**msg)
+
+                    # Track assistant message (for tool_calls)
+                    if hasattr(msg, 'role') and msg.role == "assistant":
+                        assistant_message = msg
+
+                        # Check for tool calls
+                        tool_calls = getattr(msg, 'tool_calls', None) or getattr(msg, 'function_call', None)
+
+                        if tool_calls:
+                            tool_used_this_iteration = True
+                            # Extract tool call information
+                            if isinstance(tool_calls, list):
+                                for tc in tool_calls:
+                                    tc_name = tc.get("name", "unknown") if isinstance(tc, dict) else getattr(tc, "name", "unknown")
+                                    step = {
+                                        "type": "tool_use",
+                                        "tool_name": tc_name,
+                                        "content": msg.content or "",
+                                        "iteration": iteration,
+                                        "timestamp": time.time()
+                                    }
+                                    yield step
+                                    logger.info(f"[{self.name}] Tool use: {tc_name}")
+                            else:
+                                tc_name = tool_calls.get("name", "unknown") if isinstance(tool_calls, dict) else getattr(tool_calls, "name", "unknown")
+                                step = {
+                                    "type": "tool_use",
+                                    "tool_name": tc_name,
+                                    "content": msg.content or "",
+                                    "iteration": iteration,
+                                    "timestamp": time.time()
+                                }
+                                yield step
+                                logger.info(f"[{self.name}] Tool use: {tc_name}")
+
+                        elif msg.content:
+                            # Regular assistant message (thought)
+                            step = {
+                                "type": "thought",
+                                "content": msg.content,
+                                "iteration": iteration,
+                                "timestamp": time.time()
+                            }
+                            yield step
+                            logger.debug(f"[{self.name}] Thought: {msg.content[:100]}...")
+
+                    # Function results (tool outputs)
+                    elif hasattr(msg, 'role') and msg.role == FUNCTION:
+                        tool_name = getattr(msg, 'name', 'unknown')
+                        step = {
+                            "type": "tool_result",
+                            "tool_name": tool_name,
+                            "content": msg.content or "",
+                            "iteration": iteration,
+                            "timestamp": time.time()
+                        }
+                        yield step
+                        logger.debug(f"[{self.name}] Tool result from {tool_name}")
+
+                    # Add to history
+                    self._add_to_history(msg)
+
+                # If no tool was used, this is the final answer
+                if not tool_used_this_iteration:
+                    if assistant_message and assistant_message.content:
+                        # Mark the last thought as final answer
+                        final_step = {
+                            "type": "final_answer",
+                            "content": assistant_message.content,
+                            "iteration": iteration,
+                            "timestamp": time.time()
+                        }
+                        yield final_step
+                        logger.info(f"[{self.name}] Final answer reached")
+                    break
+
+            if iteration >= max_iterations:
+                logger.warning(f"[{self.name}] Max iterations ({max_iterations}) reached")
+
+            logger.info(f"[{self.name}] Reasoning stream completed with {iteration} iterations")
+
+        except Exception as e:
+            logger.error(f"[{self.name}] Error running agent with reasoning stream: {e}")
+            # Yield error step
+            yield {
+                "type": "error",
+                "content": str(e),
+                "iteration": iteration,
+                "timestamp": time.time()
+            }
+            raise
+
     def run(
         self,
         prompt: str,
