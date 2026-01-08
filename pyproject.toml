@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "qwen-agent-mcp-scheduler"
 version = "0.1.0"
-description = "Qwen Agent SDK with MCP integration and task scheduling"
+description = "AInTandem Agent SDK with MCP integration and task scheduling"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [

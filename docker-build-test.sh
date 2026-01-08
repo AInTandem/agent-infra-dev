@@ -1,5 +1,5 @@
 #!/bin/bash
-# Docker Build and Test Script for Qwen Agent MCP Scheduler
+# Docker Build and Test Script for AInTandem Agent MCP Scheduler
 
 set -e
 
@@ -10,12 +10,12 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-IMAGE_NAME="qwen-agent-scheduler"
+IMAGE_NAME="aintandem-agent-scheduler"
 IMAGE_TAG="latest"
-CONTAINER_NAME="qwen-agent-test"
+CONTAINER_NAME="aintandem-agent-test"
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}Qwen Agent MCP Scheduler - Docker Build${NC}"
+echo -e "${GREEN}AInTandem Agent MCP Scheduler - Docker Build${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 
@@ -58,7 +58,7 @@ docker run --rm \
     -e LOG_LEVEL=INFO \
     -e OPENAI_API_KEY=${OPENAI_API_KEY:-"test_key"} \
     -v $(pwd)/config:/app/config:ro \
-    -v qwen-test-storage:/app/storage \
+    -v aintandem-test-storage:/app/storage \
     ${IMAGE_NAME}:${IMAGE_TAG}
 
 echo ""

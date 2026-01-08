@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Qwen Agent MCP Scheduler is a local agent infrastructure built with Qwen Agent SDK, featuring:
+AInTandem Agent MCP Scheduler is a local agent infrastructure built with Qwen Agent SDK, featuring:
 - Customizable AI agents with MCP (Model Context Protocol) server integration
 - Task scheduling with Cron, Interval, and One-time scheduling
 - OpenAI-compatible REST API

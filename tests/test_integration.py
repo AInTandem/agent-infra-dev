@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Integration tests for Qwen Agent MCP Scheduler.
+Integration tests for AInTandem Agent MCP Scheduler.
 
 Tests the complete system with all components integrated.
 """
@@ -301,7 +301,7 @@ async def test_system_integration(results: TestResults, agent_manager, task_sche
 async def run_all_tests():
     """Run all integration tests."""
     print("=" * 60)
-    print("Qwen Agent MCP Scheduler - Integration Tests")
+    print("AInTandem Agent MCP Scheduler - Integration Tests")
     print("=" * 60)
 
     results = TestResults()

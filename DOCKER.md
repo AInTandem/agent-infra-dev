@@ -1,6 +1,6 @@
-# Docker Deployment Guide - Qwen Agent MCP Scheduler
+# Docker Deployment Guide - AInTandem Agent MCP Scheduler
 
-Complete guide for building and deploying Qwen Agent MCP Scheduler using Docker.
+Complete guide for building and deploying AInTandem Agent MCP Scheduler using Docker.
 
 ## Table of Contents
 

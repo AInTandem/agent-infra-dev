@@ -309,4 +309,4 @@ kubectl get services
 
 **階段狀態**: ✅ **完成**
 
-Qwen Agent MCP Scheduler 現已完全容器化，可透過 Docker 快速部署到任何支援 Docker 的平台。
+AInTandem Agent MCP Scheduler 現已完全容器化，可透過 Docker 快速部署到任何支援 Docker 的平台。

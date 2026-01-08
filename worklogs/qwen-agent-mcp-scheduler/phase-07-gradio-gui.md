@@ -180,7 +180,7 @@ Gradio App Tests
 ============================================================
 ✓ Gradio app created
 ✓ App type: <class 'gradio.blocks.Blocks'>
-✓ App title: Qwen Agent MCP Scheduler
+✓ App title: AInTandem Agent MCP Scheduler
 ✓ Blocks children: 78
 ✓ Task List Refresh (1 task)
 ✓ Scheduler running: True

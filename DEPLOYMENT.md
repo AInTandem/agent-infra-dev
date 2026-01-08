@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide covers deploying Qwen Agent MCP Scheduler to production environments.
+This guide covers deploying AInTandem Agent MCP Scheduler to production environments.
 
 ## Table of Contents
 
@@ -77,7 +77,7 @@ Create `/etc/systemd/qwen-agent.service`:
 
 ```ini
 [Unit]
-Description=Qwen Agent MCP Scheduler
+Description=AInTandem Agent MCP Scheduler
 After=network.target
 
 [Service]

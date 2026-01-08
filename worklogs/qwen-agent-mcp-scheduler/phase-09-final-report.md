@@ -8,7 +8,7 @@
 
 ## Overview
 
-This is the final phase of the Qwen Agent MCP Scheduler project. We have completed all 9 phases of development, delivering a comprehensive local agent infrastructure.
+This is the final phase of the AInTandem Agent MCP Scheduler project. We have completed all 9 phases of development, delivering a comprehensive local agent infrastructure.
 
 ---
 
@@ -309,7 +309,7 @@ Potential areas for future development:
 
 ## Conclusion
 
-The Qwen Agent MCP Scheduler project has been successfully completed across all 9 planned phases. The system provides:
+The AInTandem Agent MCP Scheduler project has been successfully completed across all 9 planned phases. The system provides:
 
 - ✅ Configuration-driven agent management
 - ✅ Flexible MCP server integration
@@ -346,4 +346,4 @@ The system is ready for deployment and can be extended with additional agents an
 
 **Project Status**: ✅ **COMPLETE**
 
-The Qwen Agent MCP Scheduler is fully functional and ready for use.
+The AInTandem Agent MCP Scheduler is fully functional and ready for use.

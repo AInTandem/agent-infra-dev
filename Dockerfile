@@ -1,4 +1,4 @@
-# Qwen Agent MCP Scheduler - Dockerfile
+# AInTandem Agent MCP Scheduler - Dockerfile
 # Multi-stage build for optimized image size
 
 # Stage 1: Builder
@@ -13,16 +13,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Install Python dependencies to system location (not --user)
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime
 FROM python:3.11-slim
 
 # Set metadata
-LABEL maintainer="Qwen Agent MCP Scheduler"
-LABEL description="Qwen Agent MCP Scheduler with MCP integration"
+LABEL maintainer="AInTandem Agent MCP Scheduler"
+LABEL description="AInTandem Agent MCP Scheduler with MCP integration"
 LABEL version="1.0.0"
 
 # Set environment variables
@@ -30,13 +30,16 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    LOG_LEVEL=INFO
+    LOG_LEVEL=INFO \
+    PYTHONPATH=/app/src
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs \
     npm \
     curl \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -46,9 +49,9 @@ RUN groupadd -r agent && useradd -r -g agent agent
 # Set working directory
 WORKDIR /app
 
-# Copy Python dependencies from builder
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+# Copy Python dependencies from builder (system site-packages)
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application files
 COPY config/ /app/config/
@@ -56,7 +59,7 @@ COPY src/ /app/src/
 COPY storage/ /app/storage/
 COPY main.py /app/
 
-# Create necessary directories
+# Create necessary directories and set permissions
 RUN mkdir -p /app/storage/tasks \
     /app/storage/logs \
     /app/storage/temp \

@@ -1,5 +1,5 @@
 """
-Storage Adapter Layer for Qwen Agent MCP Scheduler
+Storage Adapter Layer for AInTandem Agent MCP Scheduler
 
 This module provides abstract storage interfaces and implementations for:
 - Personal Edition: SQLite-based storage

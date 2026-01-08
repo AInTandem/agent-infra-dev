@@ -1,4 +1,4 @@
-# Qwen Agent MCP Scheduler 實作計劃
+# AInTandem Agent MCP Scheduler 實作計劃
 
 ## 專案概述
 

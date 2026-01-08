@@ -1,12 +1,12 @@
 version: '3.8'
 
 services:
-  # Qwen Agent MCP Scheduler - Main Service
-  qwen-agent:
+  # AInTandem Agent MCP Scheduler - Main Service
+  aintandem-agent:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: qwen-agent-scheduler
+    container_name: aintandem-agent-scheduler
     ports:
       - "8000:8000"  # FastAPI server
       - "7860:7860"  # Gradio GUI
@@ -31,7 +31,7 @@ services:
       # Configuration files (read-only)
       - ./config:/app/config:ro
       # Storage for tasks and logs
-      - qwen-storage:/app/storage
+      - aintandem-storage:/app/storage
       # Custom agents configuration (optional)
       - ./config/agents.yaml:/app/config/agents.yaml:ro
     restart: unless-stopped
@@ -42,7 +42,7 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - qwen-network
+      - aintandem-network
     # Resource limits
     deploy:
       resources:
@@ -56,7 +56,7 @@ services:
   # Optional: Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
-    container_name: qwen-nginx
+    container_name: aintandem-nginx
     ports:
       - "80:80"
       - "443:443"
@@ -64,17 +64,17 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
-      - qwen-agent
+      - aintandem-agent
     restart: unless-stopped
     networks:
-      - qwen-network
+      - aintandem-network
     profiles:
       - with-nginx
 
   # Optional: Redis for caching (future use)
   redis:
     image: redis:7-alpine
-    container_name: qwen-redis
+    container_name: aintandem-redis
     ports:
       - "6379:6379"
     volumes:
@@ -82,31 +82,31 @@ services:
     command: redis-server --appendonly yes
     restart: unless-stopped
     networks:
-      - qwen-network
+      - aintandem-network
     profiles:
       - with-redis
 
   # Optional: PostgreSQL for task persistence (future use)
   postgres:
     image: postgres:15-alpine
-    container_name: qwen-postgres
+    container_name: aintandem-postgres
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-qwen_agent}
+      - POSTGRES_DB=${POSTGRES_DB:-aintandem_agent}
       - POSTGRES_USER=${POSTGRES_USER:-agent}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
-      - qwen-network
+      - aintandem-network
     profiles:
       - with-postgres
 
 # Named volumes
 volumes:
-  qwen-storage:
+  aintandem-storage:
     driver: local
   redis-data:
     driver: local
@@ -115,5 +115,5 @@ volumes:
 
 # Network
 networks:
-  qwen-network:
+  aintandem-network:
     driver: bridge

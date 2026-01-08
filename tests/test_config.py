@@ -62,7 +62,7 @@ def test_config_manager():
     # Test app config
     app_cfg = config.app
     assert isinstance(app_cfg, AppConfig)
-    assert app_cfg.name == "Qwen Agent MCP Scheduler"
+    assert app_cfg.name == "AInTandem Agent MCP Scheduler"
     print(f"✓ App config loaded: {app_cfg.name} v{app_cfg.version}")
 
     # Test LLM config

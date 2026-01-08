@@ -213,7 +213,7 @@ class APIServer:
 
         # Create FastAPI app
         self.app = FastAPI(
-            title="Qwen Agent MCP Scheduler",
+            title="AInTandem Agent MCP Scheduler",
             description="OpenAI-compatible API for agent interactions",
             version="0.1.0",
         )
@@ -244,7 +244,7 @@ class APIServer:
         async def root():
             """Root endpoint."""
             return {
-                "name": "Qwen Agent MCP Scheduler",
+                "name": "AInTandem Agent MCP Scheduler",
                 "version": "0.1.0",
                 "status": "running",
                 "endpoints": {

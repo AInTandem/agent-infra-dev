@@ -113,7 +113,7 @@ Configuration System Tests
 
 ✓ Environment variable substitution tests passed
 
-✓ App config loaded: Qwen Agent MCP Scheduler v0.1.0
+✓ App config loaded: AInTandem Agent MCP Scheduler v0.1.0
 ✓ LLM config loaded: openai_compatible, model: deepseek-chat
 ✓ Agent configs loaded: ['researcher', 'developer', 'writer', 'analyst']
 ✓ MCP server configs loaded: ['filesystem', 'web-search', 'github', 'postgres', 'google-maps', 'puppeteer']
