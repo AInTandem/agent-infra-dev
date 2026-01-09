@@ -7,13 +7,43 @@ A comprehensive local agent infrastructure built with Qwen Agent SDK, featuring 
 - **Customizable Agents**: Define agents with custom system prompts and MCP server integrations
 - **MCP Server Integration**: Seamlessly integrate Model Context Protocol servers via YAML configuration
   - **Dual Transport Support**: Stdio for local servers, SSE for remote/streaming servers
-- **Streaming Tool Execution**: Real-time streaming responses via Server-Sent Events (SSE)
-- **WebSocket Chat**: Real-time agent reasoning with iteration-level streaming
+  - **Streaming Tool Execution**: Real-time streaming responses via Server-Sent Events (SSE)
+- **⚡ WebSocket Streaming Chat**: Real-time agent reasoning with live step-by-step display
+  - See agent's thought process as it happens
+  - Color-coded reasoning steps (thoughts, tool use, results)
+  - Auto-reconnect on connection loss
 - **Task Scheduling**: Schedule automated agent tasks with Cron, Interval, and One-time scheduling
 - **OpenAI-Compatible API**: REST API compatible with OpenAI's chat completions and function calling
-- **Gradio GUI**: User-friendly web interface for managing agents and tasks
+- **Gradio GUI**: User-friendly web interface with modular tab architecture
 - **Sandbox Execution**: Isolated execution environment with resource limits and security policies
 - **Dual Edition Storage**: Support for both Personal (SQLite) and Enterprise (PostgreSQL + Redis) deployments
+
+## Quick Start: WebSocket Streaming Chat
+
+Experience real-time agent reasoning in 3 steps:
+
+1. **Start the application**:
+   ```bash
+   python main.py
+   ```
+
+2. **Open the GUI**:
+   - Navigate to http://localhost:7860
+   - Click the **"⚡ Real-Time Chat"** tab
+
+3. **Connect and Chat**:
+   - Click **"Connect"** to establish WebSocket connection
+   - Select an agent (e.g., "researcher")
+   - Type your message and click **"Send"**
+   - Watch reasoning steps appear in real-time!
+
+**What you'll see**:
+- 💭 Blue cards - Agent's thinking process
+- 🔧 Orange cards - Tools being called
+- 📊 Purple cards - Tool execution results
+- ✅ Green cards - Final answer
+
+For detailed documentation, see [docs/websocket-streaming-reasoning.md](docs/websocket-streaming-reasoning.md).
 
 ## Architecture
 

@@ -70,11 +70,19 @@ class GradioApp:
         # Initialize config editor
         self.config_editor = ConfigEditor(config_manager)
 
-        # Initialize WebSocket chat component
-        self.ws_chat = WebSocketChatComponent(
+        # Initialize tab modules (using new modular architecture)
+        # Phase 4: Gradually migrating to tab modules
+        from .tabs import RealtimeChatTab
+
+        self.realtime_chat_tab = RealtimeChatTab(
+            config_manager=config_manager,
+            agent_manager=agent_manager,
             api_host="localhost",
             api_port=8000
         )
+
+        # Keep legacy ws_chat for backward compatibility (will be removed)
+        self.ws_chat = self.realtime_chat_tab.ws_chat
 
         # Create Gradio interface
         self.app = self._create_interface()
@@ -92,8 +100,9 @@ class GradioApp:
                     self._create_chat_tab()
 
                 # Tab 1.5: Real-Time Chat (WebSocket Streaming)
-                with gr.Tab("⚡ Real-Time Chat"):
-                    self._create_realtime_chat_tab()
+                # Phase 4: Using modular tab instead of inline method
+                with gr.Tab(self.realtime_chat_tab.title):
+                    self.realtime_chat_tab.create()
 
                 # Tab 2: Tasks
                 with gr.Tab("⏰ Tasks"):
@@ -163,33 +172,6 @@ class GradioApp:
             fn=self._clear_chat_history,
             outputs=[history_output]
         )
-
-    def _create_realtime_chat_tab(self):
-        """Create the real-time streaming chat interface tab."""
-
-        # Load CSS
-        gr.HTML(f"<style>{self.ws_chat.get_custom_css()}</style>")
-
-        # Note: JavaScript is loaded externally via main.py's head_paths parameter
-        # The static/websocket_chat.js file will be automatically included in <head>
-
-        gr.Markdown("### ⚡ Real-Time Streaming Chat")
-        gr.Markdown("""
-        **WebSocket-based real-time agent chat with streaming reasoning display.**
-
-        **Instructions:**
-        1. Open browser console (F12) to see detailed logs
-        2. Check for "[WS] ===== websocket_chat.js LOADED =====" message
-        3. Click "Connect" to establish WebSocket connection
-        4. Type your message and click "Send"
-        5. Watch reasoning steps appear in real-time
-        """)
-
-        # Add the WebSocket chat component
-        ws_component = self.ws_chat.create_interface()
-
-        # Store reference
-        self._ws_component = ws_component
 
     def _create_agents_tab(self):
         """Create the agents management tab."""

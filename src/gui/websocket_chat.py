@@ -22,9 +22,11 @@
 WebSocket Chat Component for Gradio.
 
 Provides real-time streaming reasoning display via WebSocket.
+All JavaScript logic is in static/websocket_chat.js
+This file only contains glue code to connect Gradio events to JavaScript functions.
 """
 
-import uuid
+import datetime
 from typing import Optional
 
 import gradio as gr
@@ -156,6 +158,9 @@ class WebSocketChatComponent:
     - Real-time reasoning step display
     - Status indicator
     - Custom HTML rendering
+
+    All JavaScript logic is in static/websocket_chat.js
+    This file only contains glue code for Gradio integration.
     """
 
     def __init__(self, api_host: str = "localhost", api_port: int = 8000):
@@ -220,227 +225,44 @@ class WebSocketChatComponent:
                 )
                 connect_btn = gr.Button("Connect", variant="secondary")
 
-            # Hidden components for JavaScript interaction
-            hidden_trigger = gr.Textbox(visible=False)
-            hidden_output = gr.Textbox(visible=False)
+            # ==================================================================
+            # Event Handlers - Glue code to call JavaScript functions
+            # ==================================================================
+            # Note: All actual WebSocket logic is in static/websocket_chat.js
+            # These handlers only call the JavaScript functions defined there
 
-            # Event handlers
+            # Connect button - calls gradioConnect() function in websocket_chat.js
             def on_connect(agent_name):
-                # Return JavaScript to initialize WebSocket
-                # Update debug info first
-                debug_update = f"""
-                <div id="ws-debug" style="background: #e3f2fd; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; font-size: 12px;">
-                🔍 Debug: Connect button clicked for agent '{agent_name}'<br>
-                📝 Time: {__import__('datetime').datetime.now().strftime('%H:%M:%S')}<br>
-                ⏳ Initializing WebSocket...
-                </div>
-                """
-
-                # Return the JavaScript and debug update
-                return f"""
-                {debug_update}
-                <script>
-                (function() {{
-                    console.log('[WS] ==================================================');
-                    console.log('[WS] Connect button clicked at:', new Date().toLocaleTimeString());
-                    console.log('[WS] Agent:', '{agent_name}');
-                    console.log('[WS] Checking if functions exist...');
-
-                    // Check if initWebSocketChat function exists
-                    if (typeof initWebSocketChat === 'function') {{
-                        console.log('[WS] ✓ initWebSocketChat function found');
-                    }} else {{
-                        console.error('[WS] ✗ initWebSocketChat function NOT found!');
-                        updateDebug('❌ Error: initWebSocketChat function not loaded');
-                        return;
-                    }}
-
-                    // Check if sendWebSocketMessage function exists
-                    if (typeof sendWebSocketMessage === 'function') {{
-                        console.log('[WS] ✓ sendWebSocketMessage function found');
-                    }} else {{
-                        console.error('[WS] ✗ sendWebSocketMessage function NOT found!');
-                    }}
-
-                    // Check WebSocket client status
-                    if (typeof wsClient === 'undefined') {{
-                        console.log('[WS] Creating new WebSocket client...');
-                        updateDebug('🔧 Creating new WebSocket client...');
-                    }} else if (!wsClient.isConnected) {{
-                        console.log('[WS] Reconnecting existing client...');
-                        updateDebug('🔄 Reconnecting WebSocket client...');
-                    }} else {{
-                        console.log('[WS] Client already connected');
-                        updateDebug('✅ WebSocket client already connected');
-                        return;
-                    }}
-
-                    // Initialize WebSocket
-                    try {{
-                        wsClient = initWebSocketChat();
-                        console.log('[WS] WebSocket client created:', wsClient);
-
-                        // Set up message handlers
-                        wsClient.on('connected', (data) => {{
-                            console.log('[WS] ✓ Connected event received:', data);
-                            updateDebug('✅ WebSocket Connected! Session: ' + data.data.session_id);
-                        }});
-
-                        wsClient.on('reasoning_start', (data) => {{
-                            console.log('[WS] Reasoning started');
-                            updateDebug('🤔 Reasoning started...');
-                            const container = document.getElementById('ws-session-container');
-                            if (container) {{
-                                container.innerHTML = '<div class="ws-reasoning-step ws-step-thought"><div class="ws-step-type">Starting reasoning...</div></div>';
-                            }}
-                        }});
-
-                        wsClient.on('reasoning_step', (data) => {{
-                            console.log('[WS] Reasoning step received:', data);
-                            updateDebug('📨 Step received: ' + data.data.type);
-                            const container = document.getElementById('ws-session-container');
-                            if (!container) return;
-
-                            const step = data.data;
-                            const stepType = step.type;
-
-                            let stepClass = 'ws-step-thought';
-                            let typeLabel = 'Thought';
-
-                            if (stepType === 'tool_use') {{
-                                stepClass = 'ws-step-tool_use';
-                                typeLabel = 'Tool Use';
-                            }} else if (stepType === 'tool_result') {{
-                                stepClass = 'ws-step-tool_result';
-                                typeLabel = 'Tool Result';
-                            }} else if (stepType === 'final_answer') {{
-                                stepClass = 'ws-step-final_answer';
-                                typeLabel = 'Final Answer';
-                            }} else if (stepType === 'error') {{
-                                stepClass = 'ws-step-error';
-                                typeLabel = 'Error';
-                            }}
-
-                            const timestamp = new Date(step.timestamp * 1000).toLocaleTimeString();
-                            const iteration = step.iteration ? `<span class="ws-iteration">Iter: ${{step.iteration}}</span>` : '';
-                            const toolName = step.tool_name ? `<span class="ws-tool-name">${{step.tool_name}}</span>` : '';
-
-                            const stepHtml = `
-                                <div class="${{stepClass}}">
-                                    <div class="ws-step-type">${{typeLabel}} ${{iteration}} ${{toolName}}</div>
-                                    <div class="ws-step-content">${{escapeHtml(step.content)}}</div>
-                                    <div class="ws-step-timestamp">${{timestamp}}</div>
-                                </div>
-                            `;
-
-                            container.insertAdjacentHTML('beforeend', stepHtml);
-                            container.scrollTop = container.scrollHeight;
-                        }});
-
-                        wsClient.on('reasoning_complete', () => {{
-                            console.log('[WS] Reasoning complete');
-                            updateDebug('✅ Reasoning complete!');
-                            const container = document.getElementById('ws-session-container');
-                            if (container) {{
-                                container.insertAdjacentHTML('beforeend',
-                                    '<div class="ws-reasoning-step ws-step-final_answer"><div class="ws-step-type">✓ Complete</div></div>'
-                                );
-                            }}
-                        }});
-
-                        wsClient.on('error', (data) => {{
-                            console.error('[WS] Error:', data);
-                            updateDebug('❌ Error: ' + data.data.message);
-                            const container = document.getElementById('ws-session-container');
-                            if (container) {{
-                                container.insertAdjacentHTML('beforeend',
-                                    `<div class="ws-reasoning-step ws-step-error"><div class="ws-step-type">Error</div><div class="ws-step-content">${{escapeHtml(data.data.message)}}</div></div>`
-                                );
-                            }}
-                        }});
-
-                        console.log('[WS] Message handlers registered');
-                        updateDebug('⚙️ Message handlers registered, waiting for connection...');
-
-                    }} catch (error) {{
-                        console.error('[WS] Initialization error:', error);
-                        updateDebug('❌ Initialization error: ' + error.message);
-                    }}
-
-                    console.log('[WS] ==================================================');
-
-                    // Helper function to update debug info
-                    function updateDebug(message) {{
-                        const debugDiv = document.getElementById('ws-debug');
-                        if (debugDiv) {{
-                            const time = new Date().toLocaleTimeString();
-                            debugDiv.innerHTML = `<div style="background: #e3f2fd; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; font-size: 12px;">🔍 [${{time}}] ${{message}}</div>`;
-                        }}
-                    }}
-                }})();
-                </script>
-                """
-
-            def on_send(message, agent_name, enable_reasoning):
-                # Return JavaScript to send message via WebSocket
-                import json
-                escaped_message = json.dumps(message)  # Properly escape the message
-                reasoning_bool = "true" if enable_reasoning else "false"
-                # Use format() instead of f-string to avoid brace escaping issues
-                return """
-                <script>
-                (function() {{
-                    console.log('[WS] ==================================================');
-                    console.log('[WS] Send button clicked');
-                    console.log('[WS] Message:', {escaped_msg});
-                    console.log('[WS] Agent:', '{agent}');
-                    console.log('[WS] Enable Reasoning:', {reasoning});
-
-                    // Update debug info
-                    const debugDiv = document.getElementById('ws-debug');
-                    if (debugDiv) {{
-                        const time = new Date().toLocaleTimeString();
-                        debugDiv.innerHTML = `<div style="background: #fff3e0; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; font-size: 12px;">📤 [${{time}}] Sending message to '{agent}'...</div>`;
-                    }}
-
-                    if (typeof sendWebSocketMessage === 'function') {{
-                        console.log('[WS] ✓ sendWebSocketMessage function found');
-                        console.log('[WS] Calling sendWebSocketMessage...');
-                        sendWebSocketMessage({escaped_msg}, '{agent}', {reasoning});
-                        console.log('[WS] sendWebSocketMessage called');
-                    }} else {{
-                        console.error('[WS] ✗ sendWebSocketMessage function NOT found!');
-                        if (debugDiv) {{
-                            const time = new Date().toLocaleTimeString();
-                            debugDiv.innerHTML = `<div style="background: #ffebee; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; font-size: 12px;">❌ [${{time}}] Error: sendWebSocketMessage function not loaded. Please click Connect first.</div>`;
-                        }}
-                    }}
-                    console.log('[WS] ==================================================');
-                }})();
-                </script>
-                """.format(
-                    escaped_msg=escaped_message,
-                    agent=agent_name,
-                    reasoning=reasoning_bool
-                )
+                """Update debug info when connect button is clicked."""
+                # Just return the value as-is, JavaScript handles the UI update
+                return agent_name
 
             connect_btn.click(
                 fn=on_connect,
                 inputs=[agent_dropdown],
-                outputs=[session_html]
+                outputs=[agent_dropdown],  # Output to a different component to avoid issues
+                js="(agentName) => { gradioConnect(agentName); return agentName; }"
             )
+
+            # Send button - calls gradioSend() function in websocket_chat.js
+            def on_send(message, agent_name, enable_reasoning):
+                """Update debug info when send button is clicked."""
+                # Just return values as-is, JavaScript handles the UI update
+                return [message, agent_name, enable_reasoning]
 
             send_btn.click(
                 fn=on_send,
                 inputs=[message_input, agent_dropdown, reasoning_toggle],
-                outputs=[session_html]
+                outputs=[message_input, agent_dropdown, reasoning_toggle],  # Return to inputs
+                js="(message, agentName, enableReasoning) => { gradioSend(message, agentName, enableReasoning); return [message, agentName, enableReasoning]; }"
             )
 
             # Allow Enter key to send
             message_input.submit(
                 fn=on_send,
                 inputs=[message_input, agent_dropdown, reasoning_toggle],
-                outputs=[session_html]
+                outputs=[message_input, agent_dropdown, reasoning_toggle],  # Return to inputs
+                js="(message, agentName, enableReasoning) => { gradioSend(message, agentName, enableReasoning); return [message, agentName, enableReasoning]; }"
             )
 
         return component
@@ -457,15 +279,3 @@ class WebSocketChatComponent:
     def get_custom_css(self) -> str:
         """Get the CSS for the WebSocket chat component."""
         return WEBSOCKET_CHAT_CSS
-
-
-def escape_html(text: str) -> str:
-    """Escape HTML special characters."""
-    if not text:
-        return ""
-    return (text
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-        .replace("'", "&#039;"))

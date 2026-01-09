@@ -42,14 +42,28 @@ This feature implements real-time streaming of agent reasoning steps via WebSock
 ### New Files
 - `src/core/websocket_manager.py` - WebSocket connection and message management
 - `src/api/websocket_endpoints.py` - FastAPI WebSocket routes
-- `src/gui/websocket_chat.py` - Gradio WebSocket client component
+- `static/websocket_chat.js` - Complete WebSocket client implementation (460 lines)
+- `src/gui/tabs/base_tab.py` - Abstract base class for tab modules
+- `src/gui/tabs/realtime_chat_tab.py` - Real-Time Chat tab module
+- `scripts/githooks/pre-commit` - Pre-commit hook for code quality checks
+- `scripts/githooks/install.sh` - Git hooks installation script
+- `test_js_loading.py` - Automated JavaScript loading test suite
 
 ### Modified Files
 - `src/core/__init__.py` - Export WebSocket manager
 - `src/api/openapi_server.py` - Register WebSocket routes
 - `src/agents/base_agent.py` - Add `run_with_reasoning_stream()` method
-- `main.py` - Initialize and cleanup WebSocket
-- `src/gui/app.py` - Add "Real-Time Chat" tab
+- `main.py` - Initialize WebSocket, dual-method JavaScript loading (head + head_paths)
+- `src/gui/app.py` - Integrated modular RealtimeChatTab
+- `src/gui/websocket_chat.py` - Refactored to pure Python glue code (290 lines)
+- `README.md` - Added WebSocket streaming section
+
+### Work Logs
+Detailed implementation reports in `worklogs/gui-refactoring/`:
+- `phase-1-baseline.md` - Base infrastructure setup
+- `phase-2-realtab.md` - Real-Time Chat tab extraction
+- `phase-4-mainapp.md` - Main application integration
+- `phase-5-debugging.md` - JavaScript loading debugging process
 
 ## 🚀 Usage
 
@@ -104,6 +118,75 @@ ws://localhost:8000/ws/chat/{session_id}
 ```
 
 ## 🔧 Technical Details
+
+### JavaScript Loading Strategy (Phase 5 Solution)
+
+**Challenge**: Gradio strips `<script>` tags from HTML for security, making external JavaScript loading difficult.
+
+**Solution**: Dual-method approach in `main.py`:
+
+```python
+# Method 1: External file via head_paths (Gradio 6.x)
+launch_kwargs["head_paths"] = [str(js_file)]
+
+# Method 2: Inline JavaScript as fallback
+js_content = js_file.read_text()
+head_html = f'<script>\n{js_content}\n</script>'
+launch_kwargs["head"] = launch_kwargs.get("head", "") + head_html
+```
+
+**Benefits**:
+- Redundancy ensures JavaScript loads regardless of Gradio's file serving behavior
+- Easy debugging with startup logs showing both methods
+- Works across different Gradio configurations
+
+### Modular Tab Architecture
+
+**Pattern**: BaseTab abstract class with dependency injection
+
+```python
+class BaseTab(ABC):
+    def __init__(self, config_manager, agent_manager, task_scheduler=None):
+        self.config_manager = config_manager
+        self.agent_manager = agent_manager
+        self.task_scheduler = task_scheduler
+
+    @property
+    @abstractmethod
+    def title(self) -> str:
+        pass
+
+    @abstractmethod
+    def create(self) -> gr.Blocks:
+        pass
+```
+
+**Benefits**:
+- Clear separation of concerns
+- Each tab is self-contained for testing and debugging
+- Consistent interface across all tabs
+- Easy to add new tabs
+
+### WebSocket Client Implementation
+
+**File Structure**:
+- `static/websocket_chat.js` (460 lines) - Complete WebSocket logic
+- `src/gui/websocket_chat.py` (290 lines) - Pure Python glue code
+
+**Key Functions in JavaScript**:
+- `WebSocketChatClient` class - Core WebSocket management
+- `initWebSocketChat()` - Create and initialize connection
+- `gradioConnect()` - Gradio integration handler
+- `gradioSend()` - Send message handler
+- `gradioUpdateDebug()` - UI debug updater
+
+**Handler Registration Pattern**:
+```javascript
+wsClient.on('connected', (data) => {
+    console.log('[WS] ✓ Connected event received:', data);
+    gradioUpdateDebug('✅ WebSocket Connected! Session: ' + data.data.session_id);
+});
+```
 
 ### Streaming Implementation
 
@@ -165,6 +248,90 @@ Required APIs:
 2. **No Authentication**: Currently accepts any connection
 3. **No Message Queue**: Messages sent while disconnected are lost
 4. **Iteration-Level Streaming**: Not token-level (Qwen Agent limitation)
+
+## 💡 Key Learnings & Best Practices
+
+### JavaScript Loading in Gradio 6.x
+
+**Problem**: Gradio strips `<script>` tags from HTML output for security.
+
+**Failed Approaches**:
+- ❌ Direct script injection via `gr.HTML()` - Stripped by Gradio
+- ❌ Using `gr.Blocks(head=...)` - Not working in Gradio 6.0
+- ❌ Hidden textbox + DOM manipulation - Too complex
+- ❌ External file with static serving - Path resolution issues
+
+**Working Solution**: Dual-method approach
+```python
+# main.py
+launch_kwargs["head_paths"] = [str(js_file)]  # External file
+js_content = js_file.read_text()
+launch_kwargs["head"] = launch_kwargs.get("head", "") + f'<script>\n{js_content}\n</script>'  # Inline fallback
+```
+
+**Key Insight**: The inline `head` parameter is most reliable because it embeds JavaScript directly in HTML.
+
+### Modular Tab Architecture
+
+**Pattern**: Abstract BaseTab with dependency injection
+
+```python
+# Base interface
+class BaseTab(ABC):
+    def __init__(self, config_manager, agent_manager, task_scheduler=None):
+        self.config_manager = config_manager
+        self.agent_manager = agent_manager
+        self.task_scheduler = task_scheduler
+
+    @property
+    @abstractmethod
+    def title(self) -> str:
+        pass
+
+    @abstractmethod
+    def create(self) -> gr.Blocks:
+        pass
+```
+
+**Benefits**:
+- Each tab is self-contained
+- Easier debugging and testing
+- Consistent interface
+- Easy to add new tabs
+
+### WebSocket Handler Registration
+
+**Problem**: Handlers not being called despite registration.
+
+**Cause**: Multiple WebSocket connections being created, handlers only registered on one.
+
+**Solution**: Ensure single connection instance and register handlers every time:
+```javascript
+// Check for null/undefined, not just !wsClient.isConnected
+if (wsClient === null || wsClient === undefined) {
+    wsClient = initWebSocketChat();
+}
+
+// Always register handlers, even if reusing connection
+wsClient.on('reasoning_step', (data) => { ... });
+```
+
+**Key Insight**: JavaScript `typeof null` returns `'object'`, always check for `null` explicitly.
+
+### Debugging WebSocket Connections
+
+**Add comprehensive logging**:
+```javascript
+console.log('[WS] typeof wsClient:', typeof wsClient);
+console.log('[WS] wsClient value:', wsClient);
+console.log('[WS] WebSocket readyState:', this.ws.readyState);
+console.log('[WS] Available handlers:', Array.from(this.messageHandlers.keys()));
+```
+
+**Monitor both client and server logs**:
+- Client: Browser console (F12)
+- Server: Python logs showing session IDs
+- Match session IDs to identify multiple connection issues
 
 ## 🔮 Future Enhancements
 

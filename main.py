@@ -276,10 +276,17 @@ class Application:
                     "show_error": True,
                 }
 
-                # Add head_paths if JavaScript file exists (Gradio 6.x feature)
+                # Method 1: Try head_paths first (Gradio 6.x feature for external files)
+                # Method 2: Fallback to head parameter with inline JavaScript
                 if js_file.exists():
                     launch_kwargs["head_paths"] = [str(js_file)]
-                    print(f"[INFO] Loading WebSocket JavaScript from: {js_file}")
+                    print(f"[INFO] Method 1: Loading WebSocket JavaScript via head_paths: {js_file}")
+
+                    # Also add inline JavaScript as fallback
+                    js_content = js_file.read_text()
+                    head_html = f'<script>\n{js_content}\n</script>'
+                    launch_kwargs["head"] = launch_kwargs.get("head", "") + head_html
+                    print(f"[INFO] Method 2: Also added inline JavaScript as fallback ({len(js_content)} chars)")
                 else:
                     print(f"[WARNING] WebSocket JavaScript file not found: {js_file}")
 
