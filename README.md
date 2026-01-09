@@ -6,6 +6,9 @@ A comprehensive local agent infrastructure built with Qwen Agent SDK, featuring 
 
 - **Customizable Agents**: Define agents with custom system prompts and MCP server integrations
 - **MCP Server Integration**: Seamlessly integrate Model Context Protocol servers via YAML configuration
+  - **Dual Transport Support**: Stdio for local servers, SSE for remote/streaming servers
+- **Streaming Tool Execution**: Real-time streaming responses via Server-Sent Events (SSE)
+- **WebSocket Chat**: Real-time agent reasoning with iteration-level streaming
 - **Task Scheduling**: Schedule automated agent tasks with Cron, Interval, and One-time scheduling
 - **OpenAI-Compatible API**: REST API compatible with OpenAI's chat completions and function calling
 - **Gradio GUI**: User-friendly web interface for managing agents and tasks
@@ -228,23 +231,40 @@ agents:
 
 ### MCP Server Configuration (`config/mcp_servers.yaml`)
 
+The system supports MCP servers via two transport types:
+
+- **stdio**: Standard input/output (default, for local MCP servers)
+- **sse**: Server-Sent Events (for remote/streaming MCP servers)
+
+For detailed MCP server configuration, see [docs/MCP_SERVER_CONFIGURATION.md](docs/MCP_SERVER_CONFIGURATION.md).
+
+**Quick Example**:
 ```yaml
 mcp_servers:
+  # Local stdio server
   - name: "filesystem"
+    transport: "stdio"
     command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/path"]
-    env: {}
-    description: "File system access"
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "${AGENT_ROOT_PATH}"]
     enabled: true
 
-  - name: "web-search"
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-brave-search"]
-    env:
-      BRAVE_API_KEY: "${BRAVE_API_KEY}"
-    description: "Web search via Brave Search API"
-    enabled: true
+  # Remote SSE server (streaming support)
+  - name: "remote-mcp-server"
+    transport: "sse"
+    sse:
+      url: "https://api.example.com/mcp/sse"
+      headers:
+        Authorization: "Bearer ${MCP_SERVER_TOKEN}"
+    enabled: false
 ```
+
+**Available Official Servers**:
+- `@modelcontextprotocol/server-filesystem` - File system access
+- `@modelcontextprotocol/server-brave-search` - Web search
+- `mcp-server-github` - GitHub integration
+- `mcp-server-postgres` - PostgreSQL database
+- `@modelcontextprotocol/server-google-maps` - Google Maps services
+- `@modelcontextprotocol/server-puppeteer` - Web automation
 
 ## API Usage
 
@@ -296,6 +316,11 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 | `/v1/tasks/{id}/enable` | POST | Enable task |
 | `/v1/tasks/{id}/disable` | POST | Disable task |
 | `/v1/tasks/{id}` | DELETE | Cancel task |
+| `/sse/tools/call` | POST | Stream MCP tool execution (SSE) |
+| `/sse/tools/call/by-name` | POST | Stream tool by full name (SSE) |
+| `/sse/tools` | GET | List tools with streaming support |
+| `/sse/servers` | GET | List MCP servers with transport info |
+| `/ws/chat/{session_id}` | WebSocket | Real-time agent chat with reasoning |
 
 ## Task Scheduling
 
@@ -418,13 +443,17 @@ agent-infra/
 │   ├── app.yaml           # Application settings
 │   └── storage.yaml       # Storage & cache configuration
 ├── docs/                  # Documentation
+│   ├── MCP_SERVER_CONFIGURATION.md  # MCP server configuration guide
 │   └── MCP_TROUBLESHOOTING.md  # MCP server troubleshooting guide
 ├── src/
 │   ├── core/              # Core components
 │   │   ├── config.py      # Configuration management
 │   │   ├── agent_manager.py  # Agent lifecycle
 │   │   ├── task_scheduler.py  # Task scheduling
-│   │   ├── mcp_bridge.py  # MCP integration
+│   │   ├── mcp_bridge.py  # MCP integration (stdio + SSE)
+│   │   ├── mcp_stdio_client.py  # MCP stdio client
+│   │   ├── mcp_sse_client.py    # MCP SSE client (streaming)
+│   │   ├── mcp_tool_converter.py  # MCP tool format converter
 │   │   ├── sandbox.py     # Sandbox environment
 │   │   ├── resource_limiter.py  # Resource limits
 │   │   ├── security.py    # Security policies
@@ -441,7 +470,9 @@ agent-infra/
 │   ├── agents/            # Agent implementations
 │   │   └── base_agent.py  # Base agent class
 │   ├── api/               # REST API
-│   │   └── openapi_server.py  # FastAPI server
+│   │   ├── openapi_server.py  # FastAPI server
+│   │   ├── sse_endpoints.py    # SSE endpoints for streaming
+│   │   └── websocket_endpoints.py  # WebSocket endpoints
 │   └── gui/               # Web interface
 │       └── app.py         # Gradio GUI
 ├── storage/               # Local storage (legacy)
@@ -452,8 +483,10 @@ agent-infra/
 │   ├── test_storage_adapters.py  # Storage layer tests
 │   └── test_integration.py # Integration tests
 ├── worklogs/              # Development logs
-│   └── storage-adapter-layer/  # Storage adapter implementation
-│       └── *.md          # Phase reports
+│   ├── storage-adapter-layer/  # Storage adapter implementation
+│   │   └── *.md          # Phase reports
+│   └── sse-mcp-transport/  # SSE transport implementation
+│       └── IMPLEMENTATION.md  # Implementation report
 ├── plans/                 # Implementation plans
 │   └── storage-adapter-layer.md  # Storage adapter plan
 ├── main.py                # Application entry point

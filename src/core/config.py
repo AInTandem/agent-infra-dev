@@ -231,13 +231,24 @@ class HealthCheckConfig(BaseModel):
     interval: int = 60  # seconds
 
 
+class MCPSSEConfig(BaseModel):
+    """Configuration for SSE transport."""
+    url: str
+    headers: Dict[str, str] = Field(default_factory=dict)
+
+
 class MCPServerConfig(BaseModel):
     """Configuration for a single MCP server."""
     name: str
     description: str = ""
-    command: str
+    transport: str = Field(default="stdio", pattern="^(stdio|sse)$")
+    # Stdio transport fields
+    command: Optional[str] = None
     args: List[str] = Field(default_factory=list)
     env: Dict[str, str] = Field(default_factory=dict)
+    # SSE transport fields
+    sse: Optional[MCPSSEConfig] = None
+    # Common fields
     timeout: int = 30
     enabled: bool = True
     health_check: HealthCheckConfig = Field(default_factory=HealthCheckConfig)

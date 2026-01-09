@@ -26,13 +26,17 @@ Manages connections to multiple MCP servers and provides a unified interface
 """
 
 import asyncio
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from loguru import logger
 
 from .config import ConfigManager, MCPServerConfig
+from .mcp_sse_client import MCPSSEClient
 from .mcp_stdio_client import MCPStdioClient
 from .mcp_tool_converter import MultiMCPToolConverter
+
+# Union type for both client types
+MCPClient = Union[MCPStdioClient, MCPSSEClient]
 
 
 class MCPBridge:
@@ -54,7 +58,7 @@ class MCPBridge:
             config_manager: Optional configuration manager instance
         """
         self.config_manager = config_manager or ConfigManager()
-        self._clients: Dict[str, MCPStdioClient] = {}
+        self._clients: Dict[str, MCPClient] = {}
         self._converter = MultiMCPToolConverter()
         self._is_initialized = False
 
@@ -108,15 +112,30 @@ class MCPBridge:
         Args:
             config: Server configuration
         """
-        logger.info(f"Connecting to MCP server: {config.name}")
+        logger.info(f"Connecting to MCP server: {config.name} (transport: {config.transport})")
 
-        client = MCPStdioClient(
-            name=config.name,
-            command=config.command,
-            args=config.args,
-            env=config.env,
-            timeout=config.timeout,
-        )
+        # Create client based on transport type
+        if config.transport == "sse":
+            if not config.sse:
+                raise ValueError(f"[{config.name}] SSE transport requires 'sse' configuration")
+
+            client = MCPSSEClient(
+                name=config.name,
+                url=config.sse.url,
+                headers=config.sse.headers,
+                timeout=config.timeout,
+            )
+        else:  # Default to stdio
+            if not config.command:
+                raise ValueError(f"[{config.name}] Stdio transport requires 'command'")
+
+            client = MCPStdioClient(
+                name=config.name,
+                command=config.command,
+                args=config.args,
+                env=config.env,
+                timeout=config.timeout,
+            )
 
         await client.connect()
 
@@ -375,6 +394,41 @@ class MCPBridge:
             raise ValueError(f"Server {server_name} not connected")
 
         return await client.call_tool(tool_name, arguments)
+
+    async def call_tool_stream(
+        self,
+        server_name: str,
+        tool_name: str,
+        arguments: Dict[str, Any]
+    ):
+        """
+        Call a tool on a specific MCP server with streaming response.
+
+        Args:
+            server_name: Name of the MCP server
+            tool_name: Name of the tool
+            arguments: Tool arguments
+
+        Yields:
+            Streaming response chunks
+
+        Raises:
+            ValueError: If server not connected or doesn't support streaming
+            TypeError: If client doesn't support streaming
+        """
+        client = self._clients.get(server_name)
+        if not client:
+            raise ValueError(f"Server {server_name} not connected")
+
+        # Check if client supports streaming
+        if isinstance(client, MCPSSEClient):
+            async for chunk in client.call_tool_stream(tool_name, arguments):
+                yield chunk
+        else:
+            raise TypeError(
+                f"Streaming not supported for {type(client).__name__}. "
+                f"Use SSE transport for streaming tool calls."
+            )
 
     async def call_tool_by_full_name(
         self,

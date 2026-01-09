@@ -36,6 +36,7 @@ from pydantic import BaseModel, Field
 
 from core.agent_manager import AgentManager
 from core.config import ConfigManager
+from core.mcp_bridge import get_mcp_bridge
 from core.task_models import ScheduleType
 from core.task_scheduler import TaskScheduler, get_task_scheduler
 from core.websocket_manager import WebSocketManager, get_websocket_manager
@@ -374,9 +375,23 @@ class APIServer:
         # Set agent manager for WebSocket endpoints
         set_agent_manager(self.agent_manager)
 
+        # Include SSE routes
+        from api.sse_endpoints import router as sse_router, set_mcp_bridge
+        self.app.include_router(sse_router)
+
         # Start heartbeat monitor
         ws_manager = get_websocket_manager()
         asyncio.create_task(ws_manager.start_heartbeat_monitor())
+
+        # Store config manager for later MCP bridge initialization
+        self._config_manager = self.config_manager
+
+        # Set up startup event for MCP bridge initialization
+        @self.app.on_event("startup")
+        async def startup_event():
+            """Initialize MCP bridge on startup."""
+            mcp_bridge = await get_mcp_bridge(self._config_manager)
+            set_mcp_bridge(mcp_bridge)
 
     def _extract_tool_calls(self, request: ChatCompletionRequest) -> List[Dict[str, Any]]:
         """Extract tool calls from the request."""

@@ -262,13 +262,28 @@ class Application:
         gui_thread = None
         if self.gradio_app:
             def run_gradio():
-                self.gradio_app.app.launch(
-                    server_name=api_host,
-                    server_port=gui_port,
-                    share=False,
-                    quiet=True,
-                    show_error=True,
-                )
+                # Path to JavaScript file for Gradio 6 head_paths parameter
+                from pathlib import Path
+
+                js_file = Path(__file__).parent / "static" / "websocket_chat.js"
+
+                # Prepare launch parameters
+                launch_kwargs = {
+                    "server_name": api_host,
+                    "server_port": gui_port,
+                    "share": False,
+                    "quiet": True,
+                    "show_error": True,
+                }
+
+                # Add head_paths if JavaScript file exists (Gradio 6.x feature)
+                if js_file.exists():
+                    launch_kwargs["head_paths"] = [str(js_file)]
+                    print(f"[INFO] Loading WebSocket JavaScript from: {js_file}")
+                else:
+                    print(f"[WARNING] WebSocket JavaScript file not found: {js_file}")
+
+                self.gradio_app.app.launch(**launch_kwargs)
 
             gui_thread = threading.Thread(target=run_gradio, daemon=True)
             gui_thread.start()

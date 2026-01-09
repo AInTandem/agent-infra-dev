@@ -82,6 +82,7 @@ class GradioApp:
     def _create_interface(self) -> gr.Blocks:
         """Create the Gradio interface."""
         # Note: In Gradio 6.0+, theme and css are passed to launch(), not Blocks()
+        # We'll inject JavaScript/CSS through the interface itself
         with gr.Blocks(title="AInTandem Agent MCP Scheduler") as app:
             gr.Markdown("# 🤖 AInTandem Agent MCP Scheduler")
 
@@ -165,33 +166,30 @@ class GradioApp:
 
     def _create_realtime_chat_tab(self):
         """Create the real-time streaming chat interface tab."""
+
+        # Load CSS
+        gr.HTML(f"<style>{self.ws_chat.get_custom_css()}</style>")
+
+        # Note: JavaScript is loaded externally via main.py's head_paths parameter
+        # The static/websocket_chat.js file will be automatically included in <head>
+
         gr.Markdown("### ⚡ Real-Time Streaming Chat")
         gr.Markdown("""
         **WebSocket-based real-time agent chat with streaming reasoning display.**
 
-        Features:
-        - See each reasoning step as it's generated
-        - Real-time tool use visualization
-        - Color-coded step types (thoughts, tool use, results)
-        - Auto-reconnect on disconnect
+        **Instructions:**
+        1. Open browser console (F12) to see detailed logs
+        2. Check for "[WS] ===== websocket_chat.js LOADED =====" message
+        3. Click "Connect" to establish WebSocket connection
+        4. Type your message and click "Send"
+        5. Watch reasoning steps appear in real-time
         """)
 
         # Add the WebSocket chat component
-        self.ws_chat.create_interface()
+        ws_component = self.ws_chat.create_interface()
 
-        # Add custom JavaScript
-        gr.HTML(f"""
-        <script>
-        {self.ws_chat.get_custom_js()}
-        </script>
-        """)
-
-        # Add custom CSS
-        gr.HTML(f"""
-        <style>
-        {self.ws_chat.get_custom_css()}
-        </style>
-        """)
+        # Store reference
+        self._ws_component = ws_component
 
     def _create_agents_tab(self):
         """Create the agents management tab."""

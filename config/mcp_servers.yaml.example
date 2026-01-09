@@ -1,10 +1,15 @@
 # MCP Server Configuration
 # 定義可用的 Model Context Protocol Servers
 
+# Transport Types:
+# - stdio: Standard input/output (default, for local MCP servers)
+# - sse: Server-Sent Events (for remote/streaming MCP servers)
+
 mcp_servers:
-  # 檔案系統存取
+  # 檔案系統存取 (Stdio Transport - Default)
   - name: "filesystem"
     description: "檔案系統讀寫存取"
+    transport: "stdio"
     command: "npx"
     args:
       - "-y"
@@ -18,9 +23,10 @@ mcp_servers:
       enabled: true
       interval: 60  # 每 60 秒檢查一次
 
-  # Brave 搜尋
+  # Brave 搜尋 (Stdio Transport)
   - name: "web-search"
     description: "網路搜尋功能（使用 Brave Search API）"
+    transport: "stdio"
     command: "npx"
     args:
       - "-y"
@@ -28,14 +34,31 @@ mcp_servers:
     env:
       BRAVE_API_KEY: "${BRAVE_API_KEY}"
     timeout: 30
-    enabled: true
+    enabled: false
     health_check:
       enabled: true
       interval: 60
 
-  # GitHub 整合
+  # OpenWebSearch - 免費多引擎網路搜尋（無需 API Key）
+  - name: "open-websearch"
+    description: "免費多引擎網路搜尋（Bing, Baidu, DuckDuckGo, Brave 等）"
+    transport: "stdio"
+    command: "npx"
+    args:
+      - "-y"
+      - "open-websearch@1.1.5"
+    env:
+      DEFAULT_SEARCH_ENGINE: "brave"
+    timeout: 30
+    enabled: false
+    health_check:
+      enabled: true
+      interval: 60
+
+  # GitHub 整合 (Stdio Transport)
   - name: "github"
     description: "GitHub 操作（Repositories, Issues, Pull Requests）"
+    transport: "stdio"
     command: "uvx"
     args:
       - "mcp-server-github"
@@ -47,9 +70,10 @@ mcp_servers:
       enabled: true
       interval: 60
 
-  # PostgreSQL 資料庫
+  # PostgreSQL 資料庫 (Stdio Transport)
   - name: "postgres"
     description: "PostgreSQL 資料庫操作"
+    transport: "stdio"
     command: "uvx"
     args:
       - "mcp-server-postgres"
@@ -62,9 +86,10 @@ mcp_servers:
       enabled: true
       interval: 60
 
-  # Google Maps
+  # Google Maps (Stdio Transport)
   - name: "google-maps"
     description: "Google Maps 地理資訊服務"
+    transport: "stdio"
     command: "npx"
     args:
       - "-y"
@@ -77,9 +102,10 @@ mcp_servers:
       enabled: true
       interval: 60
 
-  # Puppeteer 網頁自動化
+  # Puppeteer 網頁自動化 (Stdio Transport)
   - name: "puppeteer"
     description: "網頁自動化與抓取"
+    transport: "stdio"
     command: "npx"
     args:
       - "-y"
@@ -89,3 +115,34 @@ mcp_servers:
     enabled: false
     health_check:
       enabled: false  # Puppeteer 啟動較慢，可以停用健康檢查
+
+  # ========================================
+  # SSE Transport Examples (串流傳輸範例)
+  # ========================================
+
+  # 遠端 SSE MCP Server 範例
+  # - name: "remote-mcp-server"
+  #   description: "遠端 MCP 伺服器（支援串流回應）"
+  #   transport: "sse"
+  #   sse:
+  #     url: "https://example.com/mcp/sse"
+  #     headers:
+  #       Authorization: "Bearer ${MCP_SERVER_TOKEN}"
+  #   timeout: 30
+  #   enabled: false
+  #   health_check:
+  #     enabled: true
+  #     interval: 60
+
+  # 本地 SSE MCP Server 範例（如果你的本地 MCP server 支援 SSE）
+  # - name: "local-sse-server"
+  #   description: "本地 SSE MCP 伺服器"
+  #   transport: "sse"
+  #   sse:
+  #     url: "http://localhost:3000/sse"
+  #     headers: {}
+  #   timeout: 30
+  #   enabled: false
+  #   health_check:
+  #     enabled: true
+  #     interval: 30
