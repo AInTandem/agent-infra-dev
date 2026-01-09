@@ -1,0 +1,2208 @@
+openapi: 3.1.0
+info:
+  title: AInTandem API
+  description: |
+    AInTandem is a coworking space built for AI. This API enables developers to create workspaces,
+    deploy AI agent teams in isolated sandboxes, and facilitate cross-container collaboration.
+
+    ## Authentication
+
+    All API endpoints require authentication using JWT tokens. Include the token in the Authorization header:
+
+    ```
+    Authorization: Bearer {your_token}
+    ```
+
+    ## Rate Limiting
+
+    API requests are rate limited based on your plan:
+    - Community Edition: 100 requests/hour per workspace
+    - Enterprise Edition: 1000 requests/hour per workspace
+
+    ## SDKs
+
+    Official SDKs are available:
+    - Python: `pip install aintandem`
+    - TypeScript: `npm install @aintandem/sdk`
+
+    ## Documentation
+
+    - Developer Portal: https://developers.aintandem.com
+    - API Reference: https://api.aintandem.com/docs
+    - Community: https://community.aintandem.com
+  version: 1.0.0
+  contact:
+    name: AInTandem API Support
+    email: api-support@aintandem.com
+    url: https://www.aintandem.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+  - url: https://api.aintandem.com/api/v1
+    description: Production server
+  - url: https://api-staging.aintandem.com/api/v1
+    description: Staging server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Workspaces
+    description: Workspace management operations
+  - name: Sandboxes
+    description: Sandbox lifecycle management
+  - name: Messages
+    description: Agent communication and messaging
+  - name: Collaboration
+    description: Multi-agent collaboration orchestration
+  - name: Configuration
+    description: System and workspace configuration
+  - name: Monitoring
+    description: Health, metrics, and observability
+  - name: System
+    description: System information and health checks
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user
+      description: Create a new user account
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login user
+      description: Authenticate with email/password and receive access token
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      description: Get a new access token using refresh token
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [access_token, expires_in]
+                        properties:
+                          access_token:
+                            type: string
+                          expires_in:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout user
+      description: Invalidate current session
+      operationId: logout
+      responses:
+        '204':
+          description: Logout successful
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /workspaces:
+    get:
+      tags: [Workspaces]
+      summary: List workspaces
+      description: Retrieve all workspaces accessible to the authenticated user
+      operationId: listWorkspaces
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+        - $ref: '#/components/parameters/SortQuery'
+        - $ref: '#/components/parameters/OrderQuery'
+        - $ref: '#/components/parameters/SearchQuery'
+      responses:
+        '200':
+          description: Workspaces retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Workspace'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Workspaces]
+      summary: Create workspace
+      description: Create a new workspace for organizing AI agents
+      operationId: createWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceCreateRequest'
+      responses:
+        '201':
+          description: Workspace created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Workspace'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /workspaces/{workspace_id}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceIdPath'
+
+    get:
+      tags: [Workspaces]
+      summary: Get workspace details
+      description: Retrieve detailed information about a specific workspace
+      operationId: getWorkspace
+      responses:
+        '200':
+          description: Workspace details retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Workspace'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Workspaces]
+      summary: Update workspace
+      description: Update workspace configuration and settings
+      operationId: updateWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceUpdateRequest'
+      responses:
+        '200':
+          description: Workspace updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Workspace'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Workspaces]
+      summary: Delete workspace
+      description: Delete a workspace and all its resources
+      operationId: deleteWorkspace
+      responses:
+        '204':
+          description: Workspace deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /workspaces/{workspace_id}/sandboxes:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceIdPath'
+
+    get:
+      tags: [Sandboxes]
+      summary: List sandboxes
+      description: Retrieve all sandboxes in a workspace
+      operationId: listSandboxes
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+        - $ref: '#/components/parameters/SortQuery'
+        - $ref: '#/components/parameters/OrderQuery'
+        - name: status
+          in: query
+          description: Filter by sandbox status
+          schema:
+            type: string
+            enum: [running, stopped, error]
+      responses:
+        '200':
+          description: Sandboxes retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Sandbox'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags: [Sandboxes]
+      summary: Create sandbox
+      description: Create a new sandbox with an AI agent team
+      operationId: createSandbox
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SandboxCreateRequest'
+      responses:
+        '201':
+          description: Sandbox created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Sandbox'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /sandboxes/{sandbox_id}:
+    parameters:
+      - $ref: '#/components/parameters/SandboxIdPath'
+
+    get:
+      tags: [Sandboxes]
+      summary: Get sandbox details
+      description: Retrieve detailed information about a sandbox
+      operationId: getSandbox
+      responses:
+        '200':
+          description: Sandbox details retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Sandbox'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Sandboxes]
+      summary: Delete sandbox
+      description: Delete a sandbox and free resources
+      operationId: deleteSandbox
+      responses:
+        '204':
+          description: Sandbox deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /sandboxes/{sandbox_id}/start:
+    parameters:
+      - $ref: '#/components/parameters/SandboxIdPath'
+
+    post:
+      tags: [Sandboxes]
+      summary: Start sandbox
+      description: Start a stopped sandbox
+      operationId: startSandbox
+      responses:
+        '202':
+          description: Sandbox start initiated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [sandbox_id, status]
+                        properties:
+                          sandbox_id:
+                            type: string
+                          status:
+                            type: string
+                            enum: [starting]
+                          estimated_ready_seconds:
+                            type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /sandboxes/{sandbox_id}/stop:
+    parameters:
+      - $ref: '#/components/parameters/SandboxIdPath'
+
+    post:
+      tags: [Sandboxes]
+      summary: Stop sandbox
+      description: Stop a running sandbox
+      operationId: stopSandbox
+      responses:
+        '202':
+          description: Sandbox stop initiated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [sandbox_id, status]
+                        properties:
+                          sandbox_id:
+                            type: string
+                          status:
+                            type: string
+                            enum: [stopping]
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /sandboxes/{sandbox_id}/restart:
+    parameters:
+      - $ref: '#/components/parameters/SandboxIdPath'
+
+    post:
+      tags: [Sandboxes]
+      summary: Restart sandbox
+      description: Restart a sandbox
+      operationId: restartSandbox
+      responses:
+        '202':
+          description: Sandbox restart initiated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [sandbox_id, status]
+                        properties:
+                          sandbox_id:
+                            type: string
+                          status:
+                            type: string
+                            enum: [restarting]
+
+  /sandboxes/{sandbox_id}/status:
+    parameters:
+      - $ref: '#/components/parameters/SandboxIdPath'
+
+    get:
+      tags: [Sandboxes]
+      summary: Get sandbox status
+      description: Retrieve current status and health information
+      operationId: getSandboxStatus
+      responses:
+        '200':
+          description: Sandbox status retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SandboxStatus'
+
+  /sandboxes/{sandbox_id}/logs:
+    parameters:
+      - $ref: '#/components/parameters/SandboxIdPath'
+
+    get:
+      tags: [Sandboxes]
+      summary: Get sandbox logs
+      description: Retrieve logs from a sandbox
+      operationId: getSandboxLogs
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of log entries
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+        - name: since
+          in: query
+          description: ISO 8601 timestamp to fetch logs since
+          schema:
+            type: string
+            format: date-time
+        - name: level
+          in: query
+          description: Filter by log level
+          schema:
+            type: string
+            enum: [debug, info, warn, error]
+      responses:
+        '200':
+          description: Logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LogsResponse'
+
+  /sandboxes/{sandbox_id}/messages:
+    parameters:
+      - $ref: '#/components/parameters/SandboxIdPath'
+
+    get:
+      tags: [Messages]
+      summary: Get messages
+      description: Retrieve messages sent to/from this sandbox
+      operationId: getMessages
+      parameters:
+        - name: direction
+          in: query
+          description: Filter by message direction
+          schema:
+            type: string
+            enum: [sent, received, both]
+            default: both
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 50
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [messages]
+                        properties:
+                          messages:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AgentMessage'
+                          meta:
+                            type: object
+                            properties:
+                              total:
+                                type: integer
+                              since:
+                                type: string
+                                format: date-time
+
+    post:
+      tags: [Messages]
+      summary: Send message
+      description: Send a message from this sandbox to another
+      operationId: sendMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      responses:
+        '202':
+          description: Message queued for delivery
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [message_id, status, timestamp]
+                        properties:
+                          message_id:
+                            type: string
+                          status:
+                            type: string
+                            enum: [queued]
+                          timestamp:
+                            type: string
+                            format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /workspaces/{workspace_id}/broadcast:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceIdPath'
+
+    post:
+      tags: [Messages]
+      summary: Broadcast message
+      description: Broadcast a message to all sandboxes in workspace
+      operationId: broadcastMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BroadcastMessageRequest'
+      responses:
+        '202':
+          description: Broadcast initiated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [broadcast_id, recipients, timestamp]
+                        properties:
+                          broadcast_id:
+                            type: string
+                          recipients:
+                            type: array
+                            items:
+                              type: string
+                          timestamp:
+                            type: string
+                            format: date-time
+
+  /messages/{message_id}:
+    parameters:
+      - $ref: '#/components/parameters/MessageIdPath'
+
+    get:
+      tags: [Messages]
+      summary: Get message details
+      description: Retrieve detailed information about a message
+      operationId: getMessage
+      responses:
+        '200':
+          description: Message details retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Messages]
+      summary: Retry message
+      description: Retry a failed message delivery
+      operationId: retryMessage
+      responses:
+        '202':
+          description: Message retry initiated
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /workspaces/{workspace_id}/collaboration/orchestrate:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceIdPath'
+
+    post:
+      tags: [Collaboration]
+      summary: Orchestrate collaboration
+      description: Initiate a multi-agent collaboration task
+      operationId: orchestrateCollaboration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrchestrateCollaborationRequest'
+      responses:
+        '202':
+          description: Collaboration initiated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [collaboration_id, status, participants, estimated_duration_seconds]
+                        properties:
+                          collaboration_id:
+                            type: string
+                          status:
+                            type: string
+                            enum: [initializing]
+                          participants:
+                            type: array
+                            items:
+                              type: string
+                          estimated_duration_seconds:
+                            type: integer
+
+  /collaborations/{collaboration_id}:
+    parameters:
+      - $ref: '#/components/parameters/CollaborationIdPath'
+
+    get:
+      tags: [Collaboration]
+      summary: Get collaboration status
+      description: Retrieve collaboration status and progress
+      operationId: getCollaboration
+      responses:
+        '200':
+          description: Collaboration status retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Collaboration'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /workspaces/{workspace_id}/agents/discover:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceIdPath'
+
+    get:
+      tags: [Collaboration]
+      summary: Discover agents
+      description: Discover agents by capability
+      operationId: discoverAgents
+      parameters:
+        - name: capability
+          in: query
+          description: Filter by capability
+          schema:
+            type: string
+        - name: role
+          in: query
+          description: Filter by role
+          schema:
+            type: string
+        - name: sandbox_id
+          in: query
+          description: Filter by sandbox
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agents discovered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [agents]
+                        properties:
+                          agents:
+                            type: array
+                            items:
+                              type: object
+                              required: [sandbox_id, agent_name, role, status]
+                              properties:
+                                sandbox_id:
+                                  type: string
+                                agent_name:
+                                  type: string
+                                role:
+                                  type: string
+                                capabilities:
+                                  type: array
+                                  items:
+                                    type: string
+                                status:
+                                  type: string
+                                  enum: [available, busy, offline]
+                                metrics:
+                                  type: object
+                                  properties:
+                                    messages_processed:
+                                      type: integer
+                                    avg_response_time_ms:
+                                      type: number
+
+  /workspaces/{workspace_id}/config:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceIdPath'
+
+    get:
+      tags: [Configuration]
+      summary: Get workspace configuration
+      description: Retrieve workspace configuration
+      operationId: getWorkspaceConfig
+      responses:
+        '200':
+          description: Configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WorkspaceConfig'
+
+    put:
+      tags: [Configuration]
+      summary: Update workspace configuration
+      description: Update workspace configuration
+      operationId: updateWorkspaceConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceConfigUpdateRequest'
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WorkspaceConfig'
+
+  /sandboxes/{sandbox_id}/config:
+    parameters:
+      - $ref: '#/components/parameters/SandboxIdPath'
+
+    get:
+      tags: [Configuration]
+      summary: Get sandbox configuration
+      description: Retrieve sandbox configuration
+      operationId: getSandboxConfig
+      responses:
+        '200':
+          description: Configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SandboxConfig'
+
+    put:
+      tags: [Configuration]
+      summary: Update sandbox configuration
+      description: Update sandbox configuration
+      operationId: updateSandboxConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SandboxConfigUpdateRequest'
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SandboxConfig'
+
+  /sandboxes/{sandbox_id}/metrics:
+    parameters:
+      - $ref: '#/components/parameters/SandboxIdPath'
+
+    get:
+      tags: [Monitoring]
+      summary: Get sandbox metrics
+      description: Retrieve sandbox metrics and performance data
+      operationId: getSandboxMetrics
+      responses:
+        '200':
+          description: Metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SandboxMetrics'
+
+  /workspaces/{workspace_id}/metrics/aggregate:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceIdPath'
+
+    get:
+      tags: [Monitoring]
+      summary: Get aggregated metrics
+      description: Retrieve aggregated metrics for all sandboxes in workspace
+      operationId: getAggregateMetrics
+      parameters:
+        - name: since
+          in: query
+          description: ISO 8601 timestamp for period start
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: granularity
+          in: query
+          description: Time granularity for aggregation
+          schema:
+            type: string
+            enum: [minute, hour, day]
+            default: hour
+      responses:
+        '200':
+          description: Aggregated metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AggregateMetrics'
+
+  /system/health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: System health check endpoint
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SystemHealth'
+
+  /system/info:
+    get:
+      tags: [System]
+      summary: System information
+      description: Retrieve system information and capabilities
+      operationId: systemInfo
+      security: []
+      responses:
+        '200':
+          description: System information retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SystemInfo'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token authentication
+
+  parameters:
+    WorkspaceIdPath:
+      name: workspace_id
+      in: path
+      required: true
+      description: Workspace identifier
+      schema:
+        type: string
+        pattern: '^ws_[a-z0-9]{10}$'
+      example: ws_abc123def4
+
+    SandboxIdPath:
+      name: sandbox_id
+      in: path
+      required: true
+      description: Sandbox identifier
+      schema:
+        type: string
+        pattern: '^sb_[a-z0-9]{10}$'
+      example: sb_xyz789ghi1
+
+    MessageIdPath:
+      name: message_id
+      in: path
+      required: true
+      description: Message identifier
+      schema:
+        type: string
+        pattern: '^msg_[a-z0-9]{10}$'
+      example: msg_lmn456opq2
+
+    CollaborationIdPath:
+      name: collaboration_id
+      in: path
+      required: true
+      description: Collaboration identifier
+      schema:
+        type: string
+        pattern: '^col_[a-z0-9]{10}$'
+      example: col_rst789uvw3
+
+    PageQuery:
+      name: page
+      in: query
+      description: Page number
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    PerPageQuery:
+      name: per_page
+      in: query
+      description: Items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    SortQuery:
+      name: sort
+      in: query
+      description: Sort field
+      schema:
+        type: string
+        default: created_at
+
+    OrderQuery:
+      name: order
+      in: query
+      description: Sort order
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+
+    SearchQuery:
+      name: search
+      in: query
+      description: Search query
+      schema:
+        type: string
+
+  schemas:
+    SuccessResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          description: Response data (varies by endpoint)
+        meta:
+          $ref: '#/components/schemas/Metadata'
+
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+        meta:
+          $ref: '#/components/schemas/Metadata'
+
+    Metadata:
+      type: object
+      required: [request_id, timestamp]
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique request identifier for tracing
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp in ISO 8601 format
+        version:
+          type: string
+          description: API version
+
+    ErrorDetail:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - AUTHENTICATION_FAILED
+            - AUTHORIZATION_FAILED
+            - RESOURCE_NOT_FOUND
+            - RESOURCE_ALREADY_EXISTS
+            - VALIDATION_ERROR
+            - RATE_LIMIT_EXCEEDED
+            - SANDBOX_NOT_READY
+            - MESSAGE_DELIVERY_FAILED
+            - COLLABORATION_FAILED
+            - CONFIGURATION_INVALID
+            - RESOURCE_EXHAUSTED
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error context
+        field:
+          type: string
+          description: Field that caused the error (for validation errors)
+
+    PaginationMeta:
+      type: object
+      required: [total, page, per_page, total_pages]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        per_page:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total_pages:
+          type: integer
+          minimum: 0
+        has_next:
+          type: boolean
+        has_prev:
+          type: boolean
+
+    # Authentication Schemas
+    RegisterRequest:
+      type: object
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          description: Password must be at least 8 characters
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        organization:
+          type: string
+          maxLength: 100
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [access_token, refresh_token, token_type, expires_in, user]
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+        refresh_token:
+          type: string
+          description: JWT refresh token
+        token_type:
+          type: string
+          const: Bearer
+        expires_in:
+          type: integer
+          description: Token expiration in seconds
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      required: [user_id, email, name]
+      properties:
+        user_id:
+          type: string
+          pattern: '^usr_[a-z0-9]{10}$'
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        organization:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    # Workspace Schemas
+    Workspace:
+      type: object
+      required: [workspace_id, name, owner_id, settings, created_at]
+      properties:
+        workspace_id:
+          type: string
+          pattern: '^ws_[a-z0-9]{10}$'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        owner_id:
+          type: string
+          pattern: '^usr_[a-z0-9]{10}$'
+        settings:
+          $ref: '#/components/schemas/WorkspaceSettings'
+        sandbox_count:
+          type: integer
+          minimum: 0
+        sandboxes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SandboxSummary'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    WorkspaceCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        settings:
+          $ref: '#/components/schemas/WorkspaceSettings'
+
+    WorkspaceUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        settings:
+          $ref: '#/components/schemas/WorkspaceSettings'
+
+    WorkspaceSettings:
+      type: object
+      properties:
+        max_sandboxes:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 10
+        default_llm_provider:
+          type: string
+          enum: [qwen, glm, claude, openai]
+          default: qwen
+        collaboration_policy:
+          type: string
+          enum: [allow_all, allow_list, deny_list]
+          default: allow_all
+        resource_defaults:
+          type: object
+          properties:
+            memory_mb:
+              type: integer
+              default: 512
+            cpu_cores:
+              type: number
+              default: 1
+            timeout_seconds:
+              type: integer
+              default: 300
+
+    # Sandbox Schemas
+    Sandbox:
+      type: object
+      required: [sandbox_id, name, workspace_id, status, agent_config, resources, created_at]
+      properties:
+        sandbox_id:
+          type: string
+          pattern: '^sb_[a-z0-9]{10}$'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        workspace_id:
+          type: string
+          pattern: '^ws_[a-z0-9]{10}$'
+        status:
+          type: string
+          enum: [provisioning, running, stopped, error, stopping, starting]
+        agent_config:
+          $ref: '#/components/schemas/AgentConfig'
+        resources:
+          $ref: '#/components/schemas/ResourceLimits'
+        health:
+          $ref: '#/components/schemas/HealthStatus'
+        connection_details:
+          $ref: '#/components/schemas/ConnectionDetails'
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+
+    SandboxSummary:
+      type: object
+      required: [sandbox_id, name, status]
+      properties:
+        sandbox_id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+
+    SandboxCreateRequest:
+      type: object
+      required: [name, agent_config]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        agent_config:
+          $ref: '#/components/schemas/AgentConfig'
+        resources:
+          $ref: '#/components/schemas/ResourceLimits'
+        mcp_servers:
+          type: array
+          items:
+            type: string
+        environment_variables:
+          type: object
+          additionalProperties:
+            type: string
+
+    AgentConfig:
+      type: object
+      required: [primary_agent]
+      properties:
+        primary_agent:
+          $ref: '#/components/schemas/AgentDefinition'
+        sub_agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentDefinition'
+        llm_provider:
+          type: string
+          enum: [qwen, glm, claude, openai]
+        llm_model:
+          type: string
+        llm_parameters:
+          type: object
+          properties:
+            temperature:
+              type: number
+              minimum: 0
+              maximum: 2
+            max_tokens:
+              type: integer
+              minimum: 1
+            top_p:
+              type: number
+              minimum: 0
+              maximum: 1
+
+    AgentDefinition:
+      type: object
+      required: [name, role]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        role:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        system_prompt:
+          type: string
+          maxLength: 10000
+        capabilities:
+          type: array
+          items:
+            type: string
+
+    ResourceLimits:
+      type: object
+      properties:
+        memory_mb:
+          type: integer
+          minimum: 128
+          maximum: 16384
+          default: 512
+        cpu_cores:
+          type: number
+          minimum: 0.1
+          maximum: 16
+          default: 1
+        timeout_seconds:
+          type: integer
+          minimum: 30
+          maximum: 3600
+          default: 300
+        max_processes:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+
+    HealthStatus:
+      type: object
+      required: [status, last_heartbeat]
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy, unknown]
+        last_heartbeat:
+          type: string
+          format: date-time
+        uptime_seconds:
+          type: integer
+          minimum: 0
+        restart_count:
+          type: integer
+          minimum: 0
+
+    ConnectionDetails:
+      type: object
+      properties:
+        collaboration_bus_url:
+          type: string
+          format: uri
+        api_endpoint:
+          type: string
+          format: uri
+        websocket_url:
+          type: string
+          format: uri
+
+    SandboxStatus:
+      type: object
+      required: [sandbox_id, status, health, resources, connections]
+      properties:
+        sandbox_id:
+          type: string
+        status:
+          type: string
+          enum: [provisioning, running, stopped, error, stopping, starting]
+        health:
+          $ref: '#/components/schemas/HealthStatus'
+        resources:
+          type: object
+          properties:
+            memory_mb:
+              type: object
+              properties:
+                allocated:
+                  type: integer
+                used:
+                  type: integer
+                percentage:
+                  type: number
+            cpu_cores:
+              type: object
+              properties:
+                allocated:
+                  type: number
+                used:
+                  type: number
+        connections:
+          type: object
+          properties:
+            collaboration_bus:
+              type: string
+              enum: [connected, disconnected, error]
+            mcp_servers:
+              type: object
+              additionalProperties:
+                type: string
+                enum: [connected, disconnected, error]
+
+    # Message Schemas
+    AgentMessage:
+      type: object
+      required: [message_id, from_sandbox, message_type, content, timestamp]
+      properties:
+        message_id:
+          type: string
+          pattern: '^msg_[a-z0-9]{10}$'
+        correlation_id:
+          type: string
+          description: For request-response tracking
+        from_sandbox:
+          type: string
+          pattern: '^sb_[a-z0-9]{10}$'
+        to_sandbox:
+          type: string
+          pattern: '^sb_[a-z0-9]{10}$'
+        from_agent:
+          type: string
+        to_agent:
+          type: string
+        message_type:
+          type: string
+          enum: [request, response, notification, command]
+        content:
+          type: object
+          description: Message content (flexible structure)
+        timestamp:
+          type: string
+          format: date-time
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 9
+          default: 5
+        requires_response:
+          type: boolean
+          default: false
+        timeout:
+          type: integer
+          minimum: 1
+          maximum: 300
+          description: Response timeout in seconds
+        ttl:
+          type: integer
+          minimum: 1
+          description: Message time-to-live in seconds
+        metadata:
+          type: object
+          additionalProperties: true
+
+    SendMessageRequest:
+      type: object
+      required: [to_sandbox, message_type, content]
+      properties:
+        to_sandbox:
+          type: string
+          pattern: '^sb_[a-z0-9]{10}$'
+        to_agent:
+          type: string
+        message_type:
+          type: string
+          enum: [request, response, notification, command]
+        content:
+          type: object
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 9
+        requires_response:
+          type: boolean
+        timeout:
+          type: integer
+          minimum: 1
+          maximum: 300
+
+    BroadcastMessageRequest:
+      type: object
+      required: [from_sandbox, message_type, content]
+      properties:
+        from_sandbox:
+          type: string
+          pattern: '^sb_[a-z0-9]{10}$'
+        message_type:
+          type: string
+          enum: [notification, command]
+        content:
+          type: object
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 9
+        exclude_self:
+          type: boolean
+          default: true
+
+    # Collaboration Schemas
+    Collaboration:
+      type: object
+      required: [collaboration_id, workspace_id, status, created_at]
+      properties:
+        collaboration_id:
+          type: string
+          pattern: '^col_[a-z0-9]{10}$'
+        workspace_id:
+          type: string
+          pattern: '^ws_[a-z0-9]{10}$'
+        task:
+          type: string
+        status:
+          type: string
+          enum: [initializing, in_progress, completed, failed, cancelled]
+        collaboration_mode:
+          type: string
+          enum: [orchestrated, peer_to_peer, swarm]
+        orchestrator:
+          type: string
+        participants:
+          type: array
+          items:
+            type: string
+            pattern: '^sb_[a-z0-9]{10}$'
+        progress:
+          $ref: '#/components/schemas/CollaborationProgress'
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentMessage'
+        deliverables:
+          type: array
+          items:
+            type: string
+        result:
+          type: object
+        error:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        estimated_completion:
+          type: string
+          format: date-time
+
+    OrchestrateCollaborationRequest:
+      type: object
+      required: [task, participants, collaboration_mode]
+      properties:
+        task:
+          type: string
+          minLength: 1
+        participants:
+          type: array
+          items:
+            type: string
+            pattern: '^sb_[a-z0-9]{10}$'
+          minItems: 2
+        collaboration_mode:
+          type: string
+          enum: [orchestrated, peer_to_peer, swarm]
+        orchestrator:
+          type: string
+        timeout:
+          type: integer
+          minimum: 30
+          maximum: 3600
+        deliverables:
+          type: array
+          items:
+            type: string
+
+    CollaborationProgress:
+      type: object
+      properties:
+        percentage:
+          type: number
+          minimum: 0
+          maximum: 100
+        current_step:
+          type: string
+        completed_steps:
+          type: array
+          items:
+            type: string
+        remaining_steps:
+          type: array
+          items:
+            type: string
+
+    # Metrics Schemas
+    SandboxMetrics:
+      type: object
+      required: [sandbox_id, timestamp]
+      properties:
+        sandbox_id:
+          type: string
+          pattern: '^sb_[a-z0-9]{10}$'
+        timestamp:
+          type: string
+          format: date-time
+        resources:
+          $ref: '#/components/schemas/ResourceMetrics'
+        messaging:
+          $ref: '#/components/schemas/MessagingMetrics'
+        health:
+          $ref: '#/components/schemas/HealthMetrics'
+
+    ResourceMetrics:
+      type: object
+      properties:
+        cpu_usage_percent:
+          type: number
+          minimum: 0
+          maximum: 100
+        memory_usage_mb:
+          type: integer
+          minimum: 0
+        memory_usage_percent:
+          type: number
+          minimum: 0
+          maximum: 100
+        disk_usage_mb:
+          type: integer
+          minimum: 0
+        network_in_bytes:
+          type: integer
+          minimum: 0
+        network_out_bytes:
+          type: integer
+          minimum: 0
+
+    MessagingMetrics:
+      type: object
+      properties:
+        messages_sent:
+          type: integer
+          minimum: 0
+        messages_received:
+          type: integer
+          minimum: 0
+        messages_failed:
+          type: integer
+          minimum: 0
+        avg_response_time_ms:
+          type: number
+          minimum: 0
+
+    HealthMetrics:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy, unknown]
+        uptime_seconds:
+          type: integer
+          minimum: 0
+        restart_count:
+          type: integer
+          minimum: 0
+
+    AggregateMetrics:
+      type: object
+      required: [workspace_id, period, summary]
+      properties:
+        workspace_id:
+          type: string
+          pattern: '^ws_[a-z0-9]{10}$'
+        period:
+          type: object
+          required: [start, end]
+          properties:
+            start:
+              type: string
+              format: date-time
+            end:
+              type: string
+              format: date-time
+            granularity:
+              type: string
+              enum: [minute, hour, day]
+        summary:
+          type: object
+          properties:
+            total_sandboxes:
+              type: integer
+            active_sandboxes:
+              type: integer
+            total_messages:
+              type: integer
+            avg_cpu_usage:
+              type: number
+            avg_memory_usage:
+              type: number
+        by_sandbox:
+          type: array
+          items:
+            $ref: '#/components/schemas/SandboxMetrics'
+
+    # Configuration Schemas
+    WorkspaceConfig:
+      type: object
+      required: [workspace_id, settings, llm_providers, collaboration_policy]
+      properties:
+        workspace_id:
+          type: string
+          pattern: '^ws_[a-z0-9]{10}$'
+        settings:
+          $ref: '#/components/schemas/WorkspaceSettings'
+        llm_providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/LLMProviderConfig'
+        mcp_servers:
+          type: array
+          items:
+            $ref: '#/components/schemas/MCPServerConfig'
+        collaboration_policy:
+          $ref: '#/components/schemas/CollaborationPolicy'
+
+    SandboxConfig:
+      type: object
+      required: [sandbox_id, resources, environment_variables]
+      properties:
+        sandbox_id:
+          type: string
+          pattern: '^sb_[a-z0-9]{10}$'
+        resources:
+          $ref: '#/components/schemas/ResourceLimits'
+        environment_variables:
+          type: object
+          additionalProperties:
+            type: string
+
+    LLMProviderConfig:
+      type: object
+      required: [name, api_key]
+      properties:
+        name:
+          type: string
+          enum: [qwen, glm, claude, openai]
+        api_key:
+          type: string
+        base_url:
+          type: string
+          format: uri
+        models:
+          type: array
+          items:
+            type: string
+        default_model:
+          type: string
+        parameters:
+          type: object
+          properties:
+            temperature:
+              type: number
+              minimum: 0
+              maximum: 2
+            max_tokens:
+              type: integer
+              minimum: 1
+            top_p:
+              type: number
+              minimum: 0
+              maximum: 1
+
+    MCPServerConfig:
+      type: object
+      required: [name, transport]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        transport:
+          type: string
+          enum: [stdio, sse]
+        command:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        url:
+          type: string
+          format: uri
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        enabled:
+          type: boolean
+          default: true
+
+    CollaborationPolicy:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [allow_all, allow_list, deny_list]
+        rules:
+          type: array
+          items:
+            type: object
+            required: [from, to]
+            properties:
+              from:
+                type: string
+              to:
+                oneOf:
+                  - type: string
+                  - type: array
+                    items:
+                      type: string
+              message_types:
+                type: array
+                items:
+                  type: string
+                  enum: [request, response, notification, command]
+              approval_required:
+                type: boolean
+
+    WorkspaceConfigUpdateRequest:
+      type: object
+      properties:
+        settings:
+          $ref: '#/components/schemas/WorkspaceSettings'
+        llm_providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/LLMProviderConfig'
+        mcp_servers:
+          type: array
+          items:
+            $ref: '#/components/schemas/MCPServerConfig'
+
+    SandboxConfigUpdateRequest:
+      type: object
+      properties:
+        resources:
+          $ref: '#/components/schemas/ResourceLimits'
+        environment_variables:
+          type: object
+          additionalProperties:
+            type: string
+
+    # System Schemas
+    SystemHealth:
+      type: object
+      required: [status, version, services, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        version:
+          type: string
+        services:
+          type: object
+          properties:
+            api:
+              type: string
+              enum: [healthy, unhealthy, degraded]
+            collaboration_bus:
+              type: string
+              enum: [healthy, unhealthy, degraded]
+            database:
+              type: string
+              enum: [healthy, unhealthy, degraded]
+            redis:
+              type: string
+              enum: [healthy, unhealthy, degraded]
+        timestamp:
+          type: string
+          format: date-time
+
+    SystemInfo:
+      type: object
+      required: [version, edition, features]
+      properties:
+        version:
+          type: string
+        edition:
+          type: string
+          enum: [community, enterprise]
+        features:
+          type: object
+          properties:
+            max_workspaces:
+              type: integer
+            max_sandboxes_per_workspace:
+              type: integer
+            cross_machine_deployment:
+              type: boolean
+        supported_llm_providers:
+          type: array
+          items:
+            type: string
+        supported_mcp_servers:
+          type: array
+          items:
+            type: string
+
+    LogsResponse:
+      type: object
+      required: [sandbox_id, logs]
+      properties:
+        sandbox_id:
+          type: string
+          pattern: '^sb_[a-z0-9]{10}$'
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/LogEntry'
+        meta:
+          type: object
+          properties:
+            total:
+              type: integer
+            since:
+              type: string
+              format: date-time
+
+    LogEntry:
+      type: object
+      required: [timestamp, level, message]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        level:
+          type: string
+          enum: [debug, info, warn, error]
+        message:
+          type: string
+        context:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Bad request - Invalid parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized - Authentication required or failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Forbidden - Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Not found - Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Conflict:
+      description: Conflict - Resource state conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    UnprocessableEntity:
+      description: Unprocessable entity - Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    TooManyRequests:
+      description: Too many requests - Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
