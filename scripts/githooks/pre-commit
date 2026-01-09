@@ -1,0 +1,309 @@
+#!/usr/bin/env python3
+# Copyright (c) 2025 AInTandem
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+"""
+Git Pre-commit Hook
+
+Checks Python files before commit to ensure code quality.
+"""
+
+import os
+import sys
+import subprocess
+import re
+from pathlib import Path
+from typing import List, Tuple
+
+# ANSI color codes
+RED = "\033[91m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+BLUE = "\033[94m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
+
+
+def print_header(message: str):
+    """Print a formatted header."""
+    print(f"\n{BLUE}{BOLD}{'='*60}{RESET}")
+    print(f"{BLUE}{BOLD}{message:^60}{RESET}")
+    print(f"{BLUE}{BOLD}{'='*60}{RESET}\n")
+
+
+def print_success(message: str):
+    """Print success message."""
+    print(f"{GREEN}✓ {message}{RESET}")
+
+
+def print_error(message: str):
+    """Print error message."""
+    print(f"{RED}✗ {message}{RESET}")
+
+
+def print_warning(message: str):
+    """Print warning message."""
+    print(f"{YELLOW}⚠ {message}{RESET}")
+
+
+def get_changed_python_files() -> List[Path]:
+    """Get list of changed Python files in this commit."""
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        print_error("Failed to get changed files")
+        return []
+
+    files = []
+    for line in result.stdout.strip().split('\n'):
+        if line and line.endswith('.py'):
+            file_path = Path(line)
+            if file_path.exists():
+                files.append(file_path)
+
+    return files
+
+
+def check_syntax(files: List[Path]) -> Tuple[bool, List[str]]:
+    """Check Python syntax for all files."""
+    print_header("🔍 Checking Python Syntax")
+
+    errors = []
+    success = True
+
+    for file_path in files:
+        try:
+            with open(file_path, 'rb') as f:
+                compile(f.read(), str(file_path), 'exec')
+            print_success(f"{file_path}")
+        except SyntaxError as e:
+            success = False
+            error_msg = f"{file_path}:{e.lineno}: {e.msg}"
+            errors.append(error_msg)
+            print_error(f"{file_path} - Line {e.lineno}: {e.msg}")
+
+    return success, errors
+
+
+def check_imports(files: List[Path]) -> bool:
+    """Check if files can be imported."""
+    print_header("📦 Checking Imports")
+
+    success = True
+    src_path = Path("src").resolve()
+
+    for file_path in files:
+        # Try to import the module
+        try:
+            # Convert file path to module path
+            if str(file_path).startswith("src/"):
+                # Extract module path
+                parts = file_path.with_suffix('').parts
+                if 'src' in parts:
+                    src_idx = parts.index('src')
+                    module_path = '.'.join(parts[src_idx + 1:])
+
+                    # Try importing
+                    sys.path.insert(0, str(src_path.parent))
+                    try:
+                        __import__(module_path)
+                        print_success(f"{module_path}")
+                    except ImportError as e:
+                        # Some imports may fail due to dependencies
+                        # That's okay for syntax check
+                        print_warning(f"{module_path} - Skipped (import error: {e})")
+                    finally:
+                        sys.path.pop(0)
+        except Exception as e:
+            print_warning(f"{file_path} - {e}")
+
+    return success
+
+
+def run_ruff(files: List[Path]) -> Tuple[bool, List[str]]:
+    """Run ruff linter if available."""
+    print_header("🎨 Running Ruff Linter")
+
+    # Check if ruff is available
+    try:
+        subprocess.run(
+            ["ruff", "--version"],
+            capture_output=True,
+            check=True
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print_warning("Ruff not installed. Skipping...")
+        return True, []
+
+    # Convert paths to strings
+    file_paths = [str(f) for f in files]
+
+    result = subprocess.run(
+        ["ruff", "check"] + file_paths,
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode == 0:
+        print_success("No Ruff errors found")
+        return True, []
+    else:
+        errors = result.stdout.strip().split('\n')
+        for error in errors:
+            print_error(error)
+        return False, errors
+
+
+def check_for_breakpoints(files: List[Path]) -> Tuple[bool, List[str]]:
+    """Check for accidental debugger breakpoints."""
+    print_header("🚨 Checking for Debugger Breakpoints")
+
+    breakpoint_patterns = [
+        r'\bimport pdb\b',
+        r'\bpdb\.set_trace\(\)',
+        r'\bimport ipdb\b',
+        r'\bipdb\.set_trace\(\)',
+        r'\bbreakpoint\(\)',  # Python 3.7+ built-in
+        r'\b__import__\(["\']pdb["\']\)',  # Obfuscated import
+    ]
+
+    errors = []
+    success = True
+
+    for file_path in files:
+        try:
+            content = file_path.read_text()
+            for pattern in breakpoint_patterns:
+                matches = list(re.finditer(pattern, content))
+                if matches:
+                    for match in matches:
+                        line_num = content[:match.start()].count('\n') + 1
+                        line_content = content.split('\n')[line_num - 1].strip()
+                        error_msg = f"{file_path}:{line_num}: {line_content}"
+                        errors.append(error_msg)
+                        print_error(error_msg)
+                        success = False
+        except Exception as e:
+            print_warning(f"Could not read {file_path}: {e}")
+
+    if success:
+        print_success("No debugger breakpoints found")
+
+    return success, errors
+
+
+def check_for_todo_comments(files: List[Path]) -> List[str]:
+    """Check for TODO/FIXME comments (warning only)."""
+    print_header("📝 Checking for TODO/FIXME Comments")
+
+    todos = []
+    todo_patterns = [
+        (r'#\s*TODO:', 'TODO'),
+        (r'#\s*FIXME:', 'FIXME'),
+        (r'#\s*XXX:', 'XXX'),
+        (r'#\s*HACK:', 'HACK'),
+    ]
+
+    for file_path in files:
+        try:
+            content = file_path.read_text()
+            for pattern, keyword in todo_patterns:
+                matches = list(re.finditer(pattern, content, re.IGNORECASE))
+                if matches:
+                    for match in matches:
+                        line_num = content[:match.start()].count('\n') + 1
+                        line_content = content.split('\n')[line_num - 1].strip()
+                        todos.append(f"{file_path}:{line_num}: {line_content}")
+        except Exception:
+            pass
+
+    if todos:
+        print_warning(f"Found {len(todos)} TODO/FIXME comments:")
+        for todo in todos[:10]:  # Show first 10
+            print(f"  {YELLOW}{todo}{RESET}")
+        if len(todos) > 10:
+            print(f"  ... and {len(todos) - 10} more")
+    else:
+        print_success("No TODO/FIXME comments found")
+
+    return todos
+
+
+def main():
+    """Main pre-commit check function."""
+    print(f"\n{BOLD}🔬 Running Pre-commit Checks{RESET}\n")
+
+    # Get changed Python files
+    changed_files = get_changed_python_files()
+
+    if not changed_files:
+        print("No Python files to check. ✅\n")
+        return 0
+
+    print(f"Checking {len(changed_files)} Python file(s):\n")
+    for f in changed_files:
+        print(f"  • {f}")
+
+    # Run checks
+    all_passed = True
+    all_errors = []
+
+    # 1. Syntax check (critical)
+    syntax_ok, syntax_errors = check_syntax(changed_files)
+    all_passed &= syntax_ok
+    all_errors.extend(syntax_errors)
+
+    # 2. Import check (important)
+    imports_ok = check_imports(changed_files)
+    # Import failures are warnings, not blocking
+
+    # 3. Linter check (optional)
+    ruff_ok, ruff_errors = run_ruff(changed_files)
+    all_passed &= ruff_ok
+    all_errors.extend(ruff_errors)
+
+    # 4. Breakpoint check (critical)
+    bp_ok, bp_errors = check_for_breakpoints(changed_files)
+    all_passed &= bp_ok
+    all_errors.extend(bp_errors)
+
+    # 5. TODO check (warning only)
+    check_for_todo_comments(changed_files)
+
+    # Summary
+    print_header("📊 Summary")
+
+    if all_passed:
+        print(f"{GREEN}{BOLD}✅ All checks passed!{RESET}\n")
+        return 0
+    else:
+        print(f"{RED}{BOLD}❌ Pre-commit checks failed!{RESET}\n")
+        print(f"{RED}Please fix the errors above before committing.{RESET}\n")
+        print(f"{YELLOW}Tip: You can bypass this hook with:{RESET}")
+        print(f"  {BOLD}git commit --no-verify{RESET}\n")
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
