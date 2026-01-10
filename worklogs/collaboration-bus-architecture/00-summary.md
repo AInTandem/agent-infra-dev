@@ -2,10 +2,26 @@
 
 ## Project Overview
 
-**Project**: AInTandem Collaboration Bus Architecture
+**Project**: Round Table - AInTandem Agent Collaboration Bus
+**Code Name**: "Round Table" (inspired by King Arthur and the Round Table Knights)
 **Objective**: Design and specify a complete API for cross-container AI agent collaboration
 **Duration**: 2025-01-10
 **Status**: ✅ Completed
+
+## Project Name: Round Table
+
+The Collaboration Bus is codenamed **"Round Table"** - inspired by the legendary King Arthur and his knights gathering at a round table where all participants are equals.
+
+### Symbolism
+- **Equality**: All agents collaborate as equals, without hierarchy
+- **Collaboration**: Agents work together toward shared goals
+- **Community**: Multiple agents gather to share knowledge and skills
+- **Collective Intelligence**: The whole exceeds the sum of parts
+
+### Documentation Location
+- **Project README**: `docs/round-table/README.md`
+- **API Specifications**: `docs/collaboration-bus-framework/`
+- **Architecture Documents**: `docs/collaboration-bus-architecture/`
 
 ## Vision
 
@@ -344,7 +360,7 @@ This work represents a collaborative effort between:
 
 ## Conclusion
 
-The Collaboration Bus Architecture design is complete and ready for implementation. The comprehensive specifications provide:
+The **Round Table** (Collaboration Bus) architecture design is complete and ready for implementation. The comprehensive specifications provide:
 
 1. **Clear Direction**: All stakeholders understand what to build
 2. **Type Safety**: Complete schemas prevent bugs
@@ -356,7 +372,7 @@ This foundation will enable the successful development of both Python and TypeSc
 
 ---
 
-**Project**: AInTandem Collaboration Bus Architecture
+**Project**: Round Table - AInTandem Agent Collaboration Bus
 **Status**: ✅ Design Complete
 **Next Phase**: Implementation
 **Date**: 2025-01-10
