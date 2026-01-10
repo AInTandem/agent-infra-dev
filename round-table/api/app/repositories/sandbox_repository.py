@@ -1,11 +1,14 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Sandbox repository"""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.db.models import Sandbox as SandboxModel
-from api.app.models.sandbox import SandboxCreateRequest
-from api.app.models.common import generate_id
-from api.app.repositories.base import BaseRepository
+from app.db.models import Sandbox as SandboxModel
+from app.models.sandbox import SandboxCreateRequest
+from app.models.common import generate_id
+from app.repositories.base import BaseRepository
 
 
 class SandboxRepository(BaseRepository[SandboxModel, SandboxCreateRequest, dict]):
@@ -46,7 +49,7 @@ class SandboxRepository(BaseRepository[SandboxModel, SandboxCreateRequest, dict]
     async def update_status(self, sandbox_id: str, status: str) -> SandboxModel | None:
         """Update sandbox status"""
         from sqlalchemy import update
-        from api.app.db.models import Sandbox
+        from app.db.models import Sandbox
         
         stmt = (
             update(Sandbox)

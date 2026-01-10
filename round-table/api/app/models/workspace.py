@@ -1,3 +1,6 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Workspace-related Pydantic models"""
 
 from typing import Any

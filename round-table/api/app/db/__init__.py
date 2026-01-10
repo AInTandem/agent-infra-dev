@@ -1,3 +1,6 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Database module initialization"""
 
 from .base import Base, get_db_session, init_db

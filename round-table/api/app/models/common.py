@@ -1,3 +1,6 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Common Pydantic models used across the API"""
 
 import secrets

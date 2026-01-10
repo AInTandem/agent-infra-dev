@@ -1,3 +1,6 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """SQLAlchemy database models"""
 
 from datetime import datetime

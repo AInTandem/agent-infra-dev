@@ -1,3 +1,6 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Authentication-related Pydantic models"""
 
 from email_validator import validate_email as _validate_email

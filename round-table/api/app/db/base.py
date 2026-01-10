@@ -1,3 +1,6 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Database base configuration and session management"""
 
 from contextlib import asynccontextmanager
@@ -11,7 +14,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from api.app.config import settings
+from app.config import settings
 
 # Create async engine
 engine = create_async_engine(

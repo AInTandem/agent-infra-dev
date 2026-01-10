@@ -1,3 +1,6 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Sandbox-related Pydantic models"""
 
 from datetime import datetime

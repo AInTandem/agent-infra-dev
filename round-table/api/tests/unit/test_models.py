@@ -1,14 +1,17 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Unit tests for Pydantic models"""
 
 import pytest
 from datetime import datetime
 from pydantic import ValidationError
 
-from api.app.models.auth import RegisterRequest, LoginRequest
-from api.app.models.workspace import WorkspaceCreateRequest, WorkspaceSettings
-from api.app.models.sandbox import SandboxCreateRequest, AgentConfig
-from api.app.models.message import SendMessageRequest
-from api.app.models.common import generate_id
+from app.models.auth import RegisterRequest, LoginRequest
+from app.models.workspace import WorkspaceCreateRequest, WorkspaceSettings
+from app.models.sandbox import SandboxCreateRequest, AgentConfig
+from app.models.message import SendMessageRequest
+from app.models.common import generate_id
 
 
 class TestCommonModels:

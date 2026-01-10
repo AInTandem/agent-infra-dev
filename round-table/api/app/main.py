@@ -1,3 +1,6 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Round Table API - Main Application"""
 
 from contextlib import asynccontextmanager
@@ -7,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
+from .websocket.routes import on_websocket_startup, on_websocket_shutdown
 
 
 @asynccontextmanager
@@ -15,11 +19,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     # Startup
     print(f"🏰 Round Table API v{settings.app_version} starting...")
     print(f"📊 Debug mode: {settings.debug}")
-    
+
+    # Initialize WebSocket and Message Bus
+    try:
+        await on_websocket_startup()
+        print("📡 Message bus initialized")
+    except Exception as e:
+        print(f"⚠️  Warning: Message bus initialization failed: {e}")
+        print("   WebSocket features will be unavailable until Redis is connected")
+
     yield
-    
+
     # Shutdown
     print("👋 Round Table API shutting down...")
+    await on_websocket_shutdown()
+    print("📡 Message bus shut down")
 
 
 # Create FastAPI application
@@ -40,6 +54,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include WebSocket routes
+from .websocket.routes import websocket_router
+app.include_router(websocket_router)
 
 
 @app.get("/")

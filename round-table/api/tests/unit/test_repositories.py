@@ -1,19 +1,22 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Unit tests for repository pattern"""
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncSessionTransaction
 from sqlalchemy.orm import sessionmaker
 
-from api.app.db.models import Base, User, Workspace, Sandbox, Message
-from api.app.repositories import (
-    UserRepository, 
+from app.db.models import Base, User, Workspace, Sandbox, Message
+from app.repositories import (
+    UserRepository,
     WorkspaceRepository,
     SandboxRepository,
     MessageRepository
 )
-from api.app.models.auth import RegisterRequest
-from api.app.models.workspace import WorkspaceCreateRequest
-from api.app.models.sandbox import SandboxCreateRequest, AgentConfig
+from app.models.auth import RegisterRequest
+from app.models.workspace import WorkspaceCreateRequest
+from app.models.sandbox import SandboxCreateRequest, AgentConfig
 
 
 # Test database setup

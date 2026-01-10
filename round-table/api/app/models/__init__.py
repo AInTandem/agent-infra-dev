@@ -1,3 +1,6 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Pydantic models for request/response validation"""
 
 from .auth import LoginRequest, RegisterRequest, AuthResponse, User

@@ -1,3 +1,6 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Alembic migration environment configuration"""
 
 import asyncio
@@ -15,8 +18,8 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from api.app.config import settings
-from api.app.db.models import Base
+from app.config import settings
+from app.db.models import Base
 
 # Alembic Config object
 config = context.config

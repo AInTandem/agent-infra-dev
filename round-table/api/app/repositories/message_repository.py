@@ -1,12 +1,15 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Message repository"""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from api.app.db.models import Message as MessageModel
-from api.app.models.message import SendMessageRequest
-from api.app.models.common import generate_id
-from api.app.repositories.base import BaseRepository
+from app.db.models import Message as MessageModel
+from app.models.message import SendMessageRequest
+from app.models.common import generate_id
+from app.repositories.base import BaseRepository
 
 
 class MessageRepository(BaseRepository[MessageModel, SendMessageRequest, dict]):
@@ -78,7 +81,7 @@ class MessageRepository(BaseRepository[MessageModel, SendMessageRequest, dict]):
     async def update_status(self, message_id: str, status: str) -> MessageModel | None:
         """Update message status"""
         from sqlalchemy import update
-        from api.app.db.models import Message
+        from app.db.models import Message
         
         stmt = (
             update(Message)

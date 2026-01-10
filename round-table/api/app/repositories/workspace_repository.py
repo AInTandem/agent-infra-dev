@@ -1,11 +1,14 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Workspace repository"""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.db.models import Workspace as WorkspaceModel
-from api.app.models.workspace import WorkspaceCreateRequest, WorkspaceUpdateRequest
-from api.app.models.common import generate_id
-from api.app.repositories.base import BaseRepository
+from app.db.models import Workspace as WorkspaceModel
+from app.models.workspace import WorkspaceCreateRequest, WorkspaceUpdateRequest
+from app.models.common import generate_id
+from app.repositories.base import BaseRepository
 
 
 class WorkspaceRepository(BaseRepository[WorkspaceModel, WorkspaceCreateRequest, WorkspaceUpdateRequest]):
@@ -21,7 +24,7 @@ class WorkspaceRepository(BaseRepository[WorkspaceModel, WorkspaceCreateRequest,
     async def create_workspace(self, workspace_in: WorkspaceCreateRequest, user_id: str) -> WorkspaceModel:
         """Create new workspace"""
         import json
-        from api.app.models.workspace import WorkspaceSettings
+        from app.models.workspace import WorkspaceSettings
         
         workspace_data = workspace_in.model_dump()
         workspace_data["workspace_id"] = generate_id("ws")

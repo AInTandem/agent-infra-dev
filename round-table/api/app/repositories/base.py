@@ -1,3 +1,6 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """Base repository with common CRUD operations"""
 
 from typing import Any, Generic, TypeVar
@@ -6,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.db.models import Base as SQLBase
+from app.db.models import Base as SQLBase
 
 ModelType = TypeVar("ModelType", bound=SQLBase)
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)

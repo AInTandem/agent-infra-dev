@@ -1,10 +1,13 @@
+# Copyright (c) 2025 AInTandem
+# SPDX-License-Identifier: MIT
+
 """User repository"""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.db.models import User as UserModel
-from api.app.models.auth import RegisterRequest, User
-from api.app.repositories.base import BaseRepository
+from app.db.models import User as UserModel
+from app.models.auth import RegisterRequest, User
+from app.repositories.base import BaseRepository
 
 
 class UserRepository(BaseRepository[UserModel, RegisterRequest, dict]):
@@ -20,7 +23,7 @@ class UserRepository(BaseRepository[UserModel, RegisterRequest, dict]):
     async def create_user(self, user_in: RegisterRequest, hashed_password: str) -> UserModel:
         """Create new user with hashed password"""
         import secrets
-        from api.app.models.common import generate_id
+        from app.models.common import generate_id
         
         user_data = user_in.model_dump()
         user_data["hashed_password"] = hashed_password
