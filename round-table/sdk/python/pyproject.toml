@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "roundtable"
+version = "0.1.0-alpha"
+description = "Round Table SDK - AI Agent Collaboration Bus"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "AInTandem Team", email = "misterlex223@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "httpx>=0.26.0",
+    "pydantic>=2.5.0",
+    "websockets>=12.0",
+    "python-dateutil>=2.8.2",
+    "orjson>=3.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.4",
+    "pytest-asyncio>=0.23.3",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "black>=23.12.1",
+    "ruff>=0.1.9",
+    "mypy>=1.8.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/aintandem/round-table"
+Documentation = "https://docs.aintandem.com/round-table"
+Repository = "https://github.com/aintandem/round-table"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/roundtable"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
