@@ -59,6 +59,10 @@ app.add_middleware(
 from .websocket.routes import websocket_router
 app.include_router(websocket_router)
 
+# Include auth routes
+from .auth.routes import router as auth_router
+app.include_router(auth_router, prefix=settings.api_prefix)
+
 
 @app.get("/")
 async def root():
