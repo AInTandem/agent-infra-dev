@@ -63,6 +63,20 @@ app.include_router(websocket_router)
 from .auth.routes import router as auth_router
 app.include_router(auth_router, prefix=settings.api_prefix)
 
+# Include API routes
+from .api import (
+    workspaces_router,
+    sandboxes_router,
+    messages_router,
+    collaborations_router,
+    system_router,
+)
+app.include_router(workspaces_router, prefix=settings.api_prefix)
+app.include_router(sandboxes_router, prefix=settings.api_prefix)
+app.include_router(messages_router, prefix=settings.api_prefix)
+app.include_router(collaborations_router, prefix=settings.api_prefix)
+app.include_router(system_router, prefix=settings.api_prefix)
+
 
 @app.get("/")
 async def root():
