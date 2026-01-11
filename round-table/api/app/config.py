@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # Application
     app_name: str = "Round Table API"
     app_version: str = "0.1.0"
+    environment: str = "development"
     debug: bool = False
 
     # API

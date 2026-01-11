@@ -379,7 +379,7 @@ async def update_workspace_config(
 
     # Update settings
     from app.models.workspace import WorkspaceSettings
-    from app.repositories.workspace import WorkspaceUpdateRequest
+    from app.models.workspace import WorkspaceUpdateRequest
 
     new_settings = WorkspaceSettings(**settings)
     update_request = WorkspaceUpdateRequest(settings=new_settings)

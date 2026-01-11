@@ -102,25 +102,32 @@ async def system_info(
 @router.get("/workspaces/{workspace_id}/metrics/aggregate", response_model=SuccessResponse)
 async def get_aggregate_metrics(
     workspace_id: str,
-    current_user: Annotated[UserInDB, Depends(get_optional_user)],
-    db_session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserInDB | None, Depends(get_optional_user)] = None,
+    db_session: Annotated[AsyncSession, Depends(get_db)] = None,
 ):
     """
     Get aggregate metrics for a workspace
 
     Args:
         workspace_id: Workspace ID
-        current_user: Current authenticated user
+        current_user: Current authenticated user (optional)
         db_session: Database session
 
     Returns:
         SuccessResponse with aggregate metrics
 
     Raises:
-        HTTPException: 404 if workspace not found
+        HTTPException: 401 if not authenticated, 404 if workspace not found
     """
-    from fastapi import HTTPException
+    from fastapi import HTTPException, status
     from app.repositories import WorkspaceRepository, SandboxRepository, MessageRepository
+
+    # Check authentication
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
 
     workspace_repo = WorkspaceRepository(db_session)
     sandbox_repo = SandboxRepository(db_session)
