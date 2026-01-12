@@ -19,26 +19,12 @@
 # SOFTWARE.
 
 """
-Gradio Tab Modules
+Configuration Tab Sub-Modules
 
-This package contains modular tab implementations for the Gradio GUI.
-Each tab is a separate module that inherits from BaseTab.
+This package contains modular components for the configuration editor tab.
+Each section (LLM, Agents, MCP, Storage, App) is implemented as a separate module.
 """
 
-from .agents_tab import AgentsTab
-from .base_tab import BaseTab
-from .chat_tab import ChatTab
-from .config import ConfigTab
-from .realtime_chat_tab import RealtimeChatTab
-from .settings_tab import SettingsTab
-from .tasks_tab import TasksTab
+from .config_tab import ConfigTab
 
-__all__ = [
-    "AgentsTab",
-    "BaseTab",
-    "ChatTab",
-    "ConfigTab",
-    "RealtimeChatTab",
-    "SettingsTab",
-    "TasksTab",
-]
+__all__ = ["ConfigTab"]
