@@ -151,9 +151,17 @@ class LLMProviderConfig(BaseModel):
     description: str = ""
     api_key: str = ""
     base_url: str = ""
+    sdk: str = Field(
+        default="openai",
+        description="SDK type (claude, openai, qwen, etc.)"
+    )
     supports_mcp: bool = Field(
         default=False,
         description="Whether this provider has native MCP support"
+    )
+    supports_computer_use: bool = Field(
+        default=False,
+        description="Whether this provider supports Computer Use"
     )
 
     @classmethod
@@ -701,3 +709,118 @@ def validate_agent_mcp_compatibility(
                 f"but '{server_name}' has function_call_wrapper enabled. "
                 f"This adds unnecessary overhead - consider setting function_call_wrapper: false."
             )
+
+
+def validate_agent_config(
+    agent_config: AgentConfig,
+    llm_config: LLMConfig,
+    mcp_configs: Dict[str, MCPServerConfig]
+) -> List[str]:
+    """
+    Comprehensive validation for agent configuration.
+
+    Performs multiple validation checks:
+    - LLM model exists in configuration
+    - MCP server compatibility
+    - Duplicate MCP server names
+    - SDK-specific capabilities (Computer Use, Extended Thinking)
+
+    Args:
+        agent_config: Agent configuration
+        llm_config: LLM configuration
+        mcp_configs: Dictionary of MCP server configurations
+
+    Returns:
+        List of warning messages (empty if no warnings)
+
+    Raises:
+        ValueError: If critical configuration errors are found
+    """
+    warnings = []
+    errors = []
+
+    # 1. Check if LLM model exists
+    model_exists = False
+    for model in llm_config.models:
+        if model.name == agent_config.llm_model:
+            model_exists = True
+            break
+
+    if not model_exists:
+        errors.append(
+            f"Model '{agent_config.llm_model}' not found in LLM configuration. "
+            f"Available models: {[m.name for m in llm_config.models]}"
+        )
+    else:
+        # Get model config for further checks
+        model_config = None
+        for model in llm_config.models:
+            if model.name == agent_config.llm_model:
+                model_config = model
+                break
+
+        # 2. Check SDK-specific capabilities
+        if model_config:
+            provider = llm_config.providers.get(model_config.provider)
+            if provider:
+                # Check Computer Use compatibility
+                computer_use_requested = getattr(agent_config, 'computer_use_enabled', False)
+                if computer_use_requested:
+                    # Computer Use requires Claude SDK
+                    if provider.sdk != "claude":
+                        errors.append(
+                            f"Computer Use requested for agent '{agent_config.name}', "
+                            f"but model '{agent_config.llm_model}' uses '{provider.sdk}' SDK. "
+                            f"Computer Use is only supported with Claude SDK."
+                        )
+                    elif not provider.supports_computer_use:
+                        errors.append(
+                            f"Computer Use requested for agent '{agent_config.name}', "
+                            f"but provider '{provider.name}' does not support Computer Use."
+                        )
+
+                # Check Extended Thinking compatibility
+                extended_thinking_requested = getattr(agent_config, 'extended_thinking_enabled', False)
+                if extended_thinking_requested:
+                    if provider.sdk != "claude":
+                        warnings.append(
+                            f"Extended Thinking requested for agent '{agent_config.name}', "
+                            f"but model '{agent_config.llm_model}' uses '{provider.sdk}' SDK. "
+                            f"Extended Thinking is only supported with Claude SDK. "
+                            f"This setting will be ignored."
+                        )
+
+    # 3. Check for duplicate MCP server names
+    if agent_config.mcp_servers:
+        seen_servers = set()
+        duplicates = set()
+        for server_name in agent_config.mcp_servers:
+            if server_name in seen_servers:
+                duplicates.add(server_name)
+            seen_servers.add(server_name)
+
+        if duplicates:
+            warnings.append(
+                f"Agent '{agent_config.name}' has duplicate MCP server entries: {duplicates}. "
+                f"Duplicate servers will only be connected once."
+            )
+
+    # 4. MCP compatibility validation
+    try:
+        validate_agent_mcp_compatibility(agent_config, llm_config, mcp_configs)
+    except ValueError as e:
+        errors.append(str(e))
+
+    # Log warnings
+    for warning in warnings:
+        logger.warning(f"[{agent_config.name}] {warning}")
+
+    # Raise errors if any
+    if errors:
+        error_message = (
+            f"Configuration validation failed for agent '{agent_config.name}':\n" +
+            "\n".join(f"  - {e}" for e in errors)
+        )
+        raise ValueError(error_message)
+
+    return warnings
