@@ -25,12 +25,14 @@ Provides FastAPI endpoints compatible with OpenAI's Chat Completions API.
 """
 
 import asyncio
+import json
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, AsyncIterator, Dict, List, Optional, Union
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, Field
 
@@ -307,7 +309,9 @@ class APIServer:
             Supports:
             - Agent selection via model parameter
             - Function calling for scheduled tasks
-            - Streaming responses
+            - Streaming responses (stream=true)
+
+            When stream=true, returns Server-Sent Events (SSE) formatted chunks.
             """
             # Validate agent exists
             agent = self.agent_manager.get_agent(request.model)
@@ -321,8 +325,21 @@ class APIServer:
             tool_calls = self._extract_tool_calls(request)
 
             if tool_calls:
-                # Handle function calls
+                # Handle function calls (non-streaming only)
                 return await self._handle_tool_calls(request, tool_calls)
+
+            # Check if streaming requested
+            if request.stream:
+                # Return SSE streaming response
+                return StreamingResponse(
+                    self._stream_chat_completion(agent, request),
+                    media_type="text/event-stream",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "Connection": "keep-alive",
+                        "X-Accel-Buffering": "no",  # Disable nginx buffering
+                    }
+                )
             else:
                 # Normal chat completion
                 return await self._handle_chat_completion(request)
@@ -552,6 +569,97 @@ class APIServer:
         except Exception as e:
             logger.error(f"Chat completion error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
+
+    async def _stream_chat_completion(
+        self,
+        agent: Any,
+        request: ChatCompletionRequest
+    ) -> AsyncIterator[str]:
+        """
+        Stream chat completion in OpenAI-compatible SSE format.
+
+        Args:
+            agent: Agent instance
+            request: Chat completion request
+
+        Yields:
+            str: SSE-formatted chunks
+
+        SSE Format:
+        data: {"id":"chatcmpl-xxx","choices":[{"delta":{"content":"..."}}]}
+
+        data: [DONE]
+        """
+        chat_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+        created = int(time.time())
+
+        # Convert messages to prompt
+        prompt = self._messages_to_prompt(request.messages)
+
+        try:
+            # Stream agent response
+            async for chunk in agent.run_async_stream(prompt):
+                yield self._format_sse_chunk(
+                    chat_id=chat_id,
+                    created=created,
+                    model=request.model,
+                    content=chunk
+                )
+
+            # Send final chunk
+            yield self._format_sse_chunk(
+                chat_id=chat_id,
+                created=created,
+                model=request.model,
+                content="",
+                is_final=True
+            )
+
+        except Exception as e:
+            logger.error(f"Streaming error: {e}")
+            # Send error chunk
+            error_chunk = {
+                "error": {
+                    "message": str(e),
+                    "type": "streaming_error"
+                }
+            }
+            yield f"data: {json.dumps(error_chunk)}\n\n"
+
+    def _format_sse_chunk(
+        self,
+        chat_id: str,
+        created: int,
+        model: str,
+        content: str,
+        is_final: bool = False
+    ) -> str:
+        """
+        Format chunk as OpenAI-compatible SSE.
+
+        Args:
+            chat_id: Chat completion ID
+            created: Unix timestamp
+            model: Model name
+            content: Content chunk
+            is_final: Whether this is the final chunk
+
+        Returns:
+            str: SSE-formatted chunk
+        """
+        chunk = {
+            "id": chat_id,
+            "object": "chat.completion.chunk",
+            "created": created,
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "delta": {"content": content} if content else {},
+                "finish_reason": "stop" if is_final else None
+            }]
+        }
+
+        return f"data: {json.dumps(chunk)}\n\n"
 
     def _messages_to_prompt(self, messages: List[ChatMessage]) -> str:
         """Convert OpenAI messages to prompt format."""
