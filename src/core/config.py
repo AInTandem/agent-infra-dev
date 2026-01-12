@@ -151,6 +151,10 @@ class LLMProviderConfig(BaseModel):
     description: str = ""
     api_key: str = ""
     base_url: str = ""
+    supports_mcp: bool = Field(
+        default=False,
+        description="Whether this provider has native MCP support"
+    )
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "LLMProviderConfig":
@@ -167,6 +171,10 @@ class LLMModelConfig(BaseModel):
     max_tokens: int = 4096
     supports_streaming: bool = True
     supports_function_calling: bool = True
+    supports_mcp: Optional[bool] = Field(
+        default=None,
+        description="Override provider's MCP support setting. None = use provider setting."
+    )
     # Optional override fields
     api_key: Optional[str] = None
     base_url: Optional[str] = None
@@ -220,6 +228,38 @@ class LLMConfig(BaseModel):
             generation=generation,
         )
 
+    def get_model_mcp_support(self, model_name: str) -> bool:
+        """
+        Check if a model supports native MCP.
+
+        Args:
+            model_name: Name of the model to check
+
+        Returns:
+            True if the model has native MCP support, False otherwise
+        """
+        # Find the model configuration
+        model_config = None
+        for model in self.models:
+            if model.name == model_name:
+                model_config = model
+                break
+
+        if model_config is None:
+            logger.warning(f"Model '{model_name}' not found in configuration, assuming no MCP support")
+            return False
+
+        # If model explicitly sets supports_mcp, use that
+        if model_config.supports_mcp is not None:
+            return model_config.supports_mcp
+
+        # Otherwise, check provider setting
+        provider_config = self.providers.get(model_config.provider)
+        if provider_config:
+            return provider_config.supports_mcp
+
+        return False
+
 
 # ============================================================================
 # MCP Server Configuration Models
@@ -252,6 +292,11 @@ class MCPServerConfig(BaseModel):
     timeout: int = 30
     enabled: bool = True
     health_check: HealthCheckConfig = Field(default_factory=HealthCheckConfig)
+    # Function call wrapper - for models without native MCP support
+    function_call_wrapper: bool = Field(
+        default=False,
+        description="Enable function call wrapper for models without native MCP support"
+    )
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MCPServerConfig":
@@ -606,3 +651,53 @@ def get_config(config_dir: str = "config") -> ConfigManager:
         _config_manager = ConfigManager(config_dir)
         _config_manager.load_all()
     return _config_manager
+
+
+# ============================================================================
+# Configuration Validation
+# ============================================================================
+
+def validate_agent_mcp_compatibility(
+    agent_config: AgentConfig,
+    llm_config: LLMConfig,
+    mcp_configs: Dict[str, MCPServerConfig]
+) -> None:
+    """
+    Validate that agent's LLM can use its configured MCP servers.
+
+    Args:
+        agent_config: Agent configuration
+        llm_config: LLM configuration
+        mcp_configs: Dictionary of MCP server configurations
+
+    Raises:
+        ValueError: If the LLM-MCP combination is incompatible
+    """
+    # Check if LLM supports MCP
+    llm_supports_mcp = llm_config.get_model_mcp_support(agent_config.llm_model)
+
+    for server_name in agent_config.mcp_servers:
+        server = mcp_configs.get(server_name)
+        if not server:
+            logger.warning(
+                f"[{agent_config.name}] MCP server '{server_name}' not found in configuration"
+            )
+            continue
+
+        # Non-MCP model requires wrapper to be enabled
+        if not llm_supports_mcp and not server.function_call_wrapper:
+            raise ValueError(
+                f"Configuration error for agent '{agent_config.name}': "
+                f"Model '{agent_config.llm_model}' does not support native MCP, "
+                f"but MCP server '{server_name}' does not have function_call_wrapper enabled. "
+                f"Either set function_call_wrapper: true for '{server_name}' in mcp_servers.yaml, "
+                f"or use a model with native MCP support."
+            )
+
+        # Log if native MCP model is using wrapper (unnecessary overhead)
+        if llm_supports_mcp and server.function_call_wrapper:
+            logger.info(
+                f"[{agent_config.name}] Model '{agent_config.llm_model}' has native MCP support, "
+                f"but '{server_name}' has function_call_wrapper enabled. "
+                f"This adds unnecessary overhead - consider setting function_call_wrapper: false."
+            )

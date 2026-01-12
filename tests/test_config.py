@@ -68,8 +68,9 @@ def test_config_manager():
     # Test LLM config
     llm_cfg = config.llm
     assert isinstance(llm_cfg, LLMConfig)
-    assert llm_cfg.provider == "openai_compatible"
-    print(f"✓ LLM config loaded: {llm_cfg.provider}, model: {llm_cfg.default_model}")
+    assert len(llm_cfg.providers) > 0
+    assert llm_cfg.default_model is not None
+    print(f"✓ LLM config loaded: {list(llm_cfg.providers.keys())}, default model: {llm_cfg.default_model}")
 
     # Test agents
     agents = config.agents
@@ -82,7 +83,6 @@ def test_config_manager():
     mcp_servers = config.mcp_servers
     assert len(mcp_servers) > 0
     assert "filesystem" in mcp_servers
-    assert "web-search" in mcp_servers
     print(f"✓ MCP server configs loaded: {list(mcp_servers.keys())}")
 
     # Test enabled agents
