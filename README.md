@@ -1,9 +1,13 @@
 # AInTandem Agent MCP Scheduler
 
-A comprehensive local agent infrastructure built with Qwen Agent SDK, featuring MCP server integration, task scheduling, OpenAI-compatible API, Gradio GUI, and dual-edition storage support.
+A comprehensive local agent infrastructure built with Qwen Agent SDK, featuring **Dual SDK Architecture** (Qwen + Claude), MCP server integration, task scheduling, OpenAI-compatible API, Gradio GUI, and dual-edition storage support.
 
 ## Features
 
+- **🔄 Dual SDK Architecture**: Choose between Qwen Agent SDK or Claude Agent SDK per agent
+  - **Qwen SDK**: Support for multiple LLM providers (OpenAI, DeepSeek, GLM, etc.)
+  - **Claude SDK**: Native support for Computer Use and Extended Thinking
+  - **Unified Interface**: Both SDKs implement the same `IAgentAdapter` interface
 - **Customizable Agents**: Define agents with custom system prompts and MCP server integrations
 - **MCP Server Integration**: Seamlessly integrate Model Context Protocol servers via YAML configuration
   - **Dual Transport Support**: Stdio for local servers, SSE for remote/streaming servers
@@ -44,6 +48,85 @@ Experience real-time agent reasoning in 3 steps:
 - ✅ Green cards - Final answer
 
 For detailed documentation, see [docs/websocket-streaming-reasoning.md](docs/websocket-streaming-reasoning.md).
+
+## Dual SDK Architecture
+
+The system supports **both Qwen Agent SDK and Claude Agent SDK** simultaneously, allowing you to choose the best SDK for each agent's requirements.
+
+### SDK Comparison
+
+| Feature | Qwen SDK | Claude SDK |
+|---------|-----------|-------------|
+| **Multi-LLM Support** | ✅ OpenAI, DeepSeek, GLM, etc. | ❌ Claude models only |
+| **Computer Use** | ❌ | ✅ Direct browser/system control |
+| **Extended Thinking** | ❌ | ✅ Deep reasoning mode |
+| **MCP Integration** | ✅ | ✅ |
+| **Function Calling** | ✅ | ✅ Native support |
+| **Streaming** | ✅ | ✅ Native support |
+
+### When to Use Each SDK
+
+**Use Qwen SDK for:**
+- Multi-LLM deployments (cost optimization)
+- Agents using non-Claude models (GPT-4, DeepSeek, GLM)
+- Simple query-response tasks
+- High-volume automated tasks
+
+**Use Claude SDK for:**
+- Computer Use tasks (web automation, form filling, data entry)
+- Complex reasoning requiring Extended Thinking
+- Tasks benefiting from Claude's native tool calling
+- Agents that need browser interaction capabilities
+
+### Configuration
+
+Configure SDK selection in `config/agents.yaml`:
+
+```yaml
+agents:
+  # Qwen SDK agent (default)
+  - name: "researcher"
+    llm_model: "glm-4.7"
+    sdk: "qwen"  # Optional - auto-detected from model name
+    mcp_servers: ["filesystem", "web-search"]
+    enabled: true
+
+  # Claude SDK agent with Computer Use
+  - name: "browser_assistant"
+    llm_model: "claude-3-5-sonnet-20241022"
+    sdk: "claude"  # Required for Claude-specific features
+    computer_use_enabled: true
+    extended_thinking_enabled: true
+    mcp_servers: ["filesystem"]
+    enabled: false  # Set to true when ANTHROPIC_API_KEY is configured
+```
+
+### Claude SDK Setup
+
+To use Claude SDK features (Computer Use, Extended Thinking):
+
+1. **Install the Claude SDK**:
+   ```bash
+   pip install anthropic
+   ```
+
+2. **Set your API key**:
+   ```bash
+   export ANTHROPIC_API_KEY=your_key_here
+   ```
+
+3. **Add a Claude provider to `config/llm.yaml`**:
+   ```yaml
+   providers:
+     claude:
+       api_key: "${ANTHROPIC_API_KEY}"
+       base_url: https://api.anthropic.com/v1
+       description: Anthropic Claude - Computer Use & Extended Thinking
+   ```
+
+4. **Enable a Claude agent** in `config/agents.yaml`
+
+For detailed documentation, see [docs/DUAL_SDK_ARCHITECTURE.md](docs/DUAL_SDK_ARCHITECTURE.md).
 
 ## Architecture
 
@@ -478,7 +561,10 @@ agent-infra/
 ├── src/
 │   ├── core/              # Core components
 │   │   ├── config.py      # Configuration management
-│   │   ├── agent_manager.py  # Agent lifecycle
+│   │   ├── agent_manager.py  # Agent lifecycle (with SDK factory)
+│   │   ├── agent_adapter.py  # Unified agent adapter interface
+│   │   ├── qwen_agent_adapter.py  # Qwen SDK adapter
+│   │   ├── claude_agent_adapter.py # Claude SDK adapter (Computer Use)
 │   │   ├── task_scheduler.py  # Task scheduling
 │   │   ├── mcp_bridge.py  # MCP integration (stdio + SSE)
 │   │   ├── mcp_stdio_client.py  # MCP stdio client

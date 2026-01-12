@@ -305,6 +305,22 @@ class AgentConfig(BaseModel):
     llm_model: str
     enabled: bool = True
 
+    # SDK Selection
+    sdk: Optional[str] = Field(
+        default=None,
+        description="SDK to use: 'qwen' (default) or 'claude'. Auto-detected from model name if not specified."
+    )
+
+    # Claude-specific options
+    computer_use_enabled: bool = Field(
+        default=False,
+        description="Enable Computer Use capability (Claude SDK only, requires claude-3-5-sonnet-20241022 or later)"
+    )
+    extended_thinking_enabled: bool = Field(
+        default=False,
+        description="Enable Extended Thinking capability (Claude SDK only)"
+    )
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AgentConfig":
         """Create AgentConfig from dictionary."""

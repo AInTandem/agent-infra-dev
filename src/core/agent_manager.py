@@ -22,6 +22,7 @@
 Agent Manager implementation.
 
 Manages multiple agent instances with MCP tool integration.
+Supports dual SDK architecture (Qwen Agent SDK and Claude Agent SDK).
 """
 
 import asyncio
@@ -30,7 +31,7 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-from agents.base_agent import BaseAgent
+from core.agent_adapter import AgentAdapterFactory, IAgentAdapter
 from core.config import AgentConfig, ConfigManager
 from core.mcp_bridge import MCPBridge
 
@@ -65,7 +66,7 @@ class AgentManager:
         self.mcp_bridge = mcp_bridge
         self.cache_adapter = cache_adapter
 
-        self._agents: Dict[str, BaseAgent] = {}
+        self._agents: Dict[str, IAgentAdapter] = {}  # Changed from BaseAgent to IAgentAdapter
         self._llm_registry: Dict[str, Any] = {}
         self._is_initialized = False
 
@@ -115,15 +116,18 @@ class AgentManager:
         self._is_initialized = True
         logger.info(f"AgentManager initialized with {created_count}/{len(agent_configs)} agents")
 
-    async def _create_agent(self, config: AgentConfig) -> BaseAgent:
+    async def _create_agent(self, config: AgentConfig) -> IAgentAdapter:
         """
-        Create an agent from configuration.
+        Create an agent from configuration using AgentAdapterFactory.
+
+        The factory automatically selects the appropriate SDK (Qwen or Claude)
+        based on the agent's configuration.
 
         Args:
             config: Agent configuration
 
         Returns:
-            Created BaseAgent instance
+            Created IAgentAdapter instance (Qwen or Claude)
         """
         logger.info(f"Creating agent: {config.name}")
 
@@ -136,17 +140,19 @@ class AgentManager:
         # Get LLM instance
         llm = self._get_llm_for_agent(config)
 
-        # Create the agent
-        agent = BaseAgent(
+        # Use AgentAdapterFactory to create the appropriate adapter
+        agent = AgentAdapterFactory.create_adapter(
             config=config,
             llm=llm,
             tools=tools,
+            mcp_bridge=self.mcp_bridge
         )
 
         # Store the agent
         self._agents[config.name] = agent
 
-        logger.info(f"[{config.name}] Agent created with {len(tools)} tools")
+        sdk_type = agent.get_sdk_type()
+        logger.info(f"[{config.name}] {sdk_type.value.upper()} agent created with {len(tools)} tools")
         return agent
 
     def _get_llm_for_agent(self, config: AgentConfig) -> Optional[Any]:
@@ -234,7 +240,7 @@ class AgentManager:
         mcp_servers: Optional[List[str]] = None,
         llm_model: Optional[str] = None,
         description: str = "",
-    ) -> BaseAgent:
+    ) -> IAgentAdapter:
         """
         Dynamically create a new agent.
 
@@ -247,7 +253,7 @@ class AgentManager:
             description: Agent description
 
         Returns:
-            Created BaseAgent instance
+            Created IAgentAdapter instance (Qwen or Claude)
         """
         logger.info(f"Creating agent dynamically: {name}")
 
@@ -289,7 +295,7 @@ class AgentManager:
         logger.info(f"Agent {name} removed")
         return True
 
-    def get_agent(self, name: str) -> Optional[BaseAgent]:
+    def get_agent(self, name: str) -> Optional[IAgentAdapter]:
         """
         Get an agent by name.
 
@@ -297,7 +303,7 @@ class AgentManager:
             name: Agent name
 
         Returns:
-            BaseAgent instance or None
+            IAgentAdapter instance or None
         """
         return self._agents.get(name)
 
@@ -305,7 +311,7 @@ class AgentManager:
         """Get list of all agent names."""
         return list(self._agents.keys())
 
-    def get_all_agents(self) -> Dict[str, BaseAgent]:
+    def get_all_agents(self) -> Dict[str, IAgentAdapter]:
         """Get all agents."""
         return self._agents.copy()
 
@@ -321,14 +327,17 @@ class AgentManager:
         """
         agent = self._agents.get(name)
         if agent:
-            return agent.to_dict()
+            return agent.to_dict() if hasattr(agent, 'to_dict') else agent.get_stats()
         return None
 
     def get_all_agent_info(self) -> List[Dict[str, Any]]:
         """Get information about all agents."""
-        return [agent.to_dict() for agent in self._agents.values()]
+        return [
+            agent.to_dict() if hasattr(agent, 'to_dict') else agent.get_stats()
+            for agent in self._agents.values()
+        ]
 
-    async def reload_agent(self, name: str) -> Optional[BaseAgent]:
+    async def reload_agent(self, name: str) -> Optional[IAgentAdapter]:
         """
         Reload an agent from configuration.
 
@@ -336,7 +345,7 @@ class AgentManager:
             name: Agent name
 
         Returns:
-            Reloaded BaseAgent instance or None
+            Reloaded IAgentAdapter instance or None
         """
         config = self.config_manager.get_agent(name)
         if not config:
