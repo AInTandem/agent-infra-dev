@@ -161,6 +161,24 @@ class IAgentAdapter(ABC):
         """Check if this adapter supports Extended Thinking (Claude SDK only)."""
         pass
 
+    @abstractmethod
+    async def use_mcp_session(self, session: Any) -> None:
+        """
+        Use MCP session directly (for native MCP models).
+
+        This method is called by AgentManager for agents using models
+        with native MCP support. The adapter should store the session
+        and use it for tool execution instead of the function call format.
+
+        Args:
+            session: MCP ClientSession from mcp Python SDK (can be None if not available)
+
+        Note:
+            - For ClaudeAgentAdapter: Stores session for native MCP tool use
+            - For QwenAgentAdapter: Logs warning (Qwen SDK doesn't support native MCP)
+        """
+        pass
+
 
 class AgentAdapterFactory:
     """

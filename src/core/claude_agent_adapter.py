@@ -84,6 +84,9 @@ class ClaudeAgentAdapter(IAgentAdapter):
         self._history: List[Dict[str, Any]] = []
         self._max_history_length = 100
 
+        # MCP sessions (for native MCP models)
+        self._mcp_sessions: List[Any] = []
+
         # Statistics
         self._total_runs = 0
 
@@ -569,6 +572,22 @@ class ClaudeAgentAdapter(IAgentAdapter):
     def supports_extended_thinking(self) -> bool:
         """Check if Extended Thinking is enabled."""
         return self._extended_thinking_enabled
+
+    async def use_mcp_session(self, session: Any) -> None:
+        """
+        Store MCP session for native MCP tool use.
+
+        This method is called by AgentManager for agents using models
+        with native MCP support (Claude models).
+
+        Args:
+            session: MCP ClientSession from mcp Python SDK (can be None)
+        """
+        if session is not None:
+            self._mcp_sessions.append(session)
+            logger.debug(
+                f"[{self.name}] Added MCP session (total: {len(self._mcp_sessions)})"
+            )
 
     def __repr__(self) -> str:
         """String representation."""

@@ -155,6 +155,19 @@ class QwenAgentAdapter(IAgentAdapter):
         """Qwen SDK does not support Extended Thinking."""
         return False
 
+    async def use_mcp_session(self, session: Any) -> None:
+        """
+        Qwen Agent SDK does not support native MCP.
+
+        This method is called by AgentManager but should not be used
+        for Qwen-based agents. Tools should be provided via the
+        function call wrapper instead.
+        """
+        logger.warning(
+            f"[{self.name}] Qwen Agent SDK does not support native MCP. "
+            f"Use MCPFunctionCallWrapper instead to provide tools in function call format."
+        )
+
     @property
     def name(self) -> str:
         """Get agent name."""
