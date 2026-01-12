@@ -129,6 +129,71 @@ class QwenAgentAdapter(IAgentAdapter):
                 metadata={"sdk": "qwen"}
             )
 
+    async def run_async_stream(
+        self,
+        prompt: str,
+        session_id: Optional[str] = None,
+        **kwargs
+    ) -> AsyncIterator[str]:
+        """
+        Run the agent with streaming output.
+
+        Since Qwen Agent SDK may not have native token-level streaming,
+        this implementation uses a fallback strategy that yields
+        the complete response at the end, but maintains the async
+        iterator interface for compatibility.
+
+        Future enhancement: Hook into LLM callbacks for true streaming.
+        """
+        logger.debug(f"[{self.name}] Running agent with streaming (fallback mode)")
+
+        # Run the agent and get the complete response
+        response = await self.run_async(prompt, session_id=session_id, **kwargs)
+
+        # Extract and yield content chunks
+        for msg in response:
+            if isinstance(msg, dict):
+                content = msg.get("content", "")
+            elif hasattr(msg, "content"):
+                content = msg.content or ""
+            else:
+                content = str(msg)
+
+            if content:
+                # For a better streaming experience, split by sentences
+                # This gives a pseudo-streaming effect
+                chunks = self._split_content_for_streaming(content)
+                for chunk in chunks:
+                    yield chunk
+
+    def _split_content_for_streaming(self, content: str) -> List[str]:
+        """
+        Split content into smaller chunks for pseudo-streaming effect.
+
+        Splits by sentence boundaries to provide more granular updates
+        while keeping content coherent.
+        """
+        import re
+
+        # Split by sentence-ending punctuation followed by space or end
+        # This preserves paragraph structure
+        chunks = re.split(r'([.!?。！？]\s+|$)', content)
+
+        # Re-attach punctuation to the chunks
+        result = []
+        current = ""
+        for i, chunk in enumerate(chunks):
+            if chunk:
+                current += chunk
+                # If we hit a sentence ending or the last chunk, yield it
+                if i < len(chunks) - 1 and re.match(r'[.!?。！？]\s*$', chunk):
+                    result.append(current)
+                    current = ""
+                elif i == len(chunks) - 1:
+                    result.append(current)
+
+        return [c for c in result if c.strip()]
+
     def get_history(self) -> List[Dict[str, str]]:
         """Get the current message history."""
         return self._agent.get_history_dict()

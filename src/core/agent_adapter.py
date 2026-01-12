@@ -130,6 +130,34 @@ class IAgentAdapter(ABC):
         pass
 
     @abstractmethod
+    async def run_async_stream(
+        self,
+        prompt: str,
+        session_id: Optional[str] = None,
+        **kwargs
+    ) -> AsyncIterator[str]:
+        """
+        Run the agent with streaming output.
+
+        Streams the agent's response content as it's being generated,
+        enabling real-time token-by-token or chunk-by-chunk output.
+
+        Args:
+            prompt: User prompt
+            session_id: Optional session ID for multi-turn conversations
+            **kwargs: Additional arguments for the agent
+
+        Yields:
+            str: Content chunks as they are generated (tokens or text fragments)
+
+        Note:
+            - For ClaudeAgentAdapter: Uses Anthropic SDK's native streaming
+            - For QwenAgentAdapter: Simulates streaming via callback hooks
+            - Fallback behavior: Yields complete response at end if SDK doesn't support streaming
+        """
+        pass
+
+    @abstractmethod
     def get_history(self) -> List[Dict[str, str]]:
         """Get the current message history."""
         pass
