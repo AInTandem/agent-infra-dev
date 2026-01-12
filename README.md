@@ -49,6 +49,63 @@ Experience real-time agent reasoning in 3 steps:
 
 For detailed documentation, see [docs/websocket-streaming-reasoning.md](docs/websocket-streaming-reasoning.md).
 
+## HTTP Streaming API
+
+Experience OpenAI-compatible streaming responses for API clients:
+
+### Python SDK Usage
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8000/v1",
+    api_key="test"  # Not used for authentication
+)
+
+stream = client.chat.completions.create(
+    model="researcher",
+    messages=[{"role": "user", "content": "Count to 5"}],
+    stream=True
+)
+
+for chunk in stream:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="", flush=True)
+```
+
+### cURL Usage
+
+```bash
+curl -N http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "researcher",
+    "messages": [{"role": "user", "content": "Say hello"}],
+    "stream": true
+  }'
+```
+
+### LangChain Integration
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(
+    base_url="http://localhost:8000/v1",
+    model="researcher",
+    streaming=True
+)
+
+response = await llm.ainvoke("Say hello")
+```
+
+**Features:**
+- OpenAI-compatible SSE (Server-Sent Events) format
+- Token-level or chunk-level streaming
+- Compatible with OpenAI Python SDK
+- Works with LangChain, LlamaIndex, and more
+
 ## Dual SDK Architecture
 
 The system supports **both Qwen Agent SDK and Claude Agent SDK** simultaneously, allowing you to choose the best SDK for each agent's requirements.
@@ -381,7 +438,7 @@ mcp_servers:
 
 ## API Usage
 
-### Chat Completions
+### Chat Completions (Non-Streaming)
 
 ```bash
 curl -X POST http://localhost:8000/v1/chat/completions \
@@ -393,6 +450,29 @@ curl -X POST http://localhost:8000/v1/chat/completions \
     ],
     "temperature": 0.7
   }'
+```
+
+### Chat Completions (Streaming)
+
+```bash
+curl -N http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "researcher",
+    "messages": [
+      {"role": "user", "content": "Count to 5"}
+    ],
+    "stream": true
+  }'
+```
+
+**Response Format (SSE):**
+```
+data: {"id":"chatcmpl-xxx","object":"chat.completion.chunk","created":1234567890,"model":"researcher","choices":[{"delta":{"content":"1"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-xxx","object":"chat.completion.chunk","created":1234567890,"model":"researcher","choices":[{"delta":{"content":", 2"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-xxx","object":"chat.completion.chunk","created":1234567890,"model":"researcher","choices":[{"delta":{},"finish_reason":"stop"}]}
 ```
 
 ### Function Calling (Create Scheduled Task)
