@@ -41,6 +41,17 @@ llm:
       api_key: ""
       base_url: http://localhost:11434/v1
 
+    # ============================================================================
+    # Claude Provider (Anthropic)
+    # ============================================================================
+    claude:
+      description: Anthropic Claude - Computer Use & Extended Thinking
+      api_key: ${ANTHROPIC_API_KEY}
+      base_url: https://api.anthropic.com/v1
+      sdk: claude  # 標記為 Claude SDK
+      supports_computer_use: true  # 支援 Computer Use 功能
+      supports_extended_thinking: true  # 支援 Extended Thinking 功能
+
   # ============================================================================
   # 全域生成設定
   # ============================================================================
@@ -177,3 +188,61 @@ llm:
     max_tokens: 128000
     supports_function_calling: true
     supports_streaming: true
+
+  # ============================================================================
+  # Claude Models (Anthropic)
+  # ============================================================================
+  # Claude 3.5 Sonnet - 全能型模型，支援 Computer Use
+  - name: claude-3-5-sonnet-20241022
+    provider: claude
+    description: Claude 3.5 Sonnet - 全能型，支援 Computer Use
+    max_tokens: 8192
+    supports_function_calling: true
+    supports_streaming: true
+    supports_computer_use: true  # 支援 Computer Use
+    supports_extended_thinking: true  # 支援 Extended Thinking
+
+  # Claude 3.5 Haiku - 快速入門模型
+  - name: claude-3-5-haiku-20241022
+    provider: claude
+    description: Claude 3.5 Haiku - 快速響應
+    max_tokens: 8192
+    supports_function_calling: true
+    supports_streaming: true
+
+  # Claude 3 Opus - 高品質推理模型
+  - name: claude-3-opus-20240229
+    provider: claude
+    description: Claude 3 Opus - 高品質推理
+    max_tokens: 4096
+    supports_function_calling: true
+    supports_streaming: true
+    supports_extended_thinking: true  # 支援 Extended Thinking
+
+# ============================================================================
+# Dual SDK Architecture 配置說明
+# ============================================================================
+#
+# Provider SDK 標記:
+#   - sdk: "claude" - 標記此 provider 使用 Claude SDK
+#   - supports_computer_use: true - Provider 支援 Computer Use 功能
+#   - supports_extended_thinking: true - Provider 支援 Extended Thinking 功能
+#
+# Model 配置:
+#   - supports_computer_use: true - 此模型支援 Computer Use
+#   - supports_extended_thinking: true - 此模型支援 Extended Thinking
+#
+# SDK 選擇邏輯:
+#   1. Agent 配置中的 sdk 欄位優先
+#   2. 根據 model 名稱自動檢測 (包含 "claude" → Claude SDK)
+#   3. 預設使用 Qwen SDK
+#
+# 範例:
+#
+#   # Claude Agent with Computer Use
+#   - name: "browser_agent"
+#     llm_model: "claude-3-5-sonnet-20241022"
+#     sdk: "claude"
+#     computer_use_enabled: true
+#
+# 詳見: docs/DUAL_SDK_ARCHITECTURE.md

@@ -81,3 +81,94 @@ agents:
     llm_model: "Qwen/Qwen3-32B-Instruct"
     # 智譜替代方案: glm-4-plus (高品質，適合複雜數據分析)
     enabled: false  # 預設停用，需要配置後啟用
+
+  # ============================================================================
+  # Dual SDK Architecture Agents
+  # ============================================================================
+
+  # Qwen SDK Agent (Default) - Multi-LLM Support
+  # 使用 Qwen SDK 支援多種 LLM 提供商
+  - name: "qwen_agent"
+    role: "多模型支援助理"
+    description: "使用 Qwen SDK，支援 OpenAI、DeepSeek、GLM 等多種模型"
+    system_prompt: |
+      你是一位多才多藝的 AI 助理，可以使用各種不同的 LLM 模型來回答問題。
+    mcp_servers:
+      - "filesystem"
+    llm_model: "gpt-4"  # 可以替換為任何 OpenAI 相容模型
+    # sdk: "qwen"  # 可選，預設自動檢測
+    enabled: false
+
+  # Claude SDK Agent - Computer Use & Extended Thinking
+  # 使用 Claude SDK 提供獨特功能
+  - name: "browser_assistant"
+    role: "網頁操作助理"
+    description: "使用 Claude Computer Use 進行網頁操作和自動化"
+    system_prompt: |
+      你是一位專業的網頁操作助理，具備 Computer Use 能力：
+      - 瀏覽和操作網頁介面
+      - 填寫表單、點擊按鈕
+      - 截圖並分析網頁內容
+      - 執行網頁自動化任務
+
+      請精確地執行操作，並在每一步後報告結果。
+    llm_model: "claude-3-5-sonnet-20241022"
+    sdk: "claude"  # 指定使用 Claude SDK
+    computer_use_enabled: true  # 啟用 Computer Use
+    extended_thinking_enabled: true  # 啟用擴展思考
+    mcp_servers:
+      - "filesystem"
+      - "puppeteer"  # Computer Use 需要 Puppeteer MCP server
+    enabled: false  # 預設停用，需要 ANTHROPIC_API_KEY 後啟用
+
+  # Claude SDK Agent - Deep Reasoning (No Computer Use)
+  - name: "reasoning_agent"
+    role: "深度推理助理"
+    description: "使用 Claude Extended Thinking 進行複雜推理"
+    system_prompt: |
+      你是一位深度思考專家，擅長複雜問題的分析和推理。
+    llm_model: "claude-3-opus-20240229"
+    sdk: "claude"  # 指定使用 Claude SDK
+    extended_thinking_enabled: true  # 啟用擴展思考
+    # computer_use_enabled: false  # 不啟用 Computer Use
+    mcp_servers:
+      - "filesystem"
+    enabled: false  # 預設停用，需要 ANTHROPIC_API_KEY 後啟用
+
+# ============================================================================
+# Dual SDK Architecture 配置說明
+# ============================================================================
+#
+# SDK 類型 (sdk 欄位):
+#   - "qwen"  (預設): 支援多種 LLM 提供商 (OpenAI, DeepSeek, GLM, Ollama 等)
+#   - "claude": Anthropic Claude 專用功能 (Computer Use, Extended Thinking)
+#
+# Claude SDK 專用欄位:
+#   - computer_use_enabled: true/false - 啟用瀏覽器/系統自動化
+#   - extended_thinking_enabled: true/false - 啟用深度推理模式
+#
+# SDK 自動檢測:
+#   如果不指定 sdk 欄位，系統會根據 llm_model 名稱自動檢測：
+#   - 模型名稱包含 "claude" → 使用 Claude SDK
+#   - 其他模型 → 使用 Qwen SDK
+#
+# 範例:
+#
+#   # 使用 Qwen SDK (支援多種 LLM)
+#   - name: "my_agent"
+#     llm_model: "gpt-4"
+#     # sdk 自動檢測為 "qwen"
+#
+#   # 使用 Claude SDK (Computer Use)
+#   - name: "browser_agent"
+#     llm_model: "claude-3-5-sonnet-20241022"
+#     sdk: "claude"
+#     computer_use_enabled: true
+#
+#   # 使用 Claude SDK (Extended Thinking only)
+#   - name: "thinking_agent"
+#     llm_model: "claude-3-opus-20240229"
+#     sdk: "claude"
+#     extended_thinking_enabled: true
+#
+# 詳見: docs/DUAL_SDK_ARCHITECTURE.md

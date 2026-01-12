@@ -474,6 +474,9 @@ class ConfigEditor:
         llm_model: str,
         mcp_servers: List[str],
         enabled: bool,
+        sdk: str = "qwen",
+        computer_use_enabled: bool = False,
+        extended_thinking_enabled: bool = False,
     ) -> str:
         """Add new agent."""
         agents_config = self.configs.get("agents", {})
@@ -494,6 +497,16 @@ class ConfigEditor:
             "enabled": enabled,
         }
 
+        # Add Dual SDK fields
+        if sdk != "qwen":  # Only add if not default
+            new_agent["sdk"] = sdk
+
+        if computer_use_enabled:
+            new_agent["computer_use_enabled"] = True
+
+        if extended_thinking_enabled:
+            new_agent["extended_thinking_enabled"] = True
+
         agents_list.append(new_agent)
         agents_config["agents"] = agents_list
         self.configs["agents"] = agents_config
@@ -511,6 +524,9 @@ class ConfigEditor:
         llm_model: str,
         mcp_servers: List[str],
         enabled: bool,
+        sdk: str = "qwen",
+        computer_use_enabled: bool = False,
+        extended_thinking_enabled: bool = False,
     ) -> str:
         """Update existing agent."""
         agents_config = self.configs.get("agents", {})
@@ -518,7 +534,8 @@ class ConfigEditor:
 
         for i, agent in enumerate(agents_list):
             if agent.get("name") == old_name:
-                agents_list[i] = {
+                # Build agent config with conditional fields
+                agent_config = {
                     "name": name,
                     "role": role,
                     "description": description,
@@ -527,6 +544,18 @@ class ConfigEditor:
                     "llm_model": llm_model,
                     "enabled": enabled,
                 }
+
+                # Add Dual SDK fields
+                if sdk != "qwen":  # Only add if not default
+                    agent_config["sdk"] = sdk
+
+                if computer_use_enabled:
+                    agent_config["computer_use_enabled"] = True
+
+                if extended_thinking_enabled:
+                    agent_config["extended_thinking_enabled"] = True
+
+                agents_list[i] = agent_config
                 break
 
         agents_config["agents"] = agents_list

@@ -102,9 +102,25 @@ mcp_servers:
       enabled: true
       interval: 60
 
-  # Puppeteer 網頁自動化 (Stdio Transport)
+  # ============================================================================
+  # Puppeteer 網頁自動化
+  # ============================================================================
+  # 重要：Claude SDK 的 Computer Use 功能需要此伺服器
+  #
+  # 當 Agent 配置中設定了 computer_use_enabled: true 時，
+  # 必須同時配置 puppeteer MCP 伺服器
+  #
+  # 範例 Agent 配置：
+  #   - name: "browser_agent"
+  #     llm_model: "claude-3-5-sonnet-20241022"
+  #     sdk: "claude"
+  #     computer_use_enabled: true
+  #     mcp_servers:
+  #       - "filesystem"
+  #       - "puppeteer"  # 必須包含此伺服器
+  # ============================================================================
   - name: "puppeteer"
-    description: "網頁自動化與抓取"
+    description: "網頁自動化與抓取（Claude Computer Use 必需）"
     transport: "stdio"
     command: "npx"
     args:
@@ -146,3 +162,25 @@ mcp_servers:
   #   health_check:
   #     enabled: true
   #     interval: 30
+
+# ============================================================================
+# Dual SDK Architecture - MCP Server 配置建議
+# ============================================================================
+#
+# Qwen SDK Agents (推薦配置):
+#   - filesystem: 檔案系統操作
+#   - web-search: 網路搜尋
+#   - github: GitHub 整合
+#   - postgres: 資料庫操作
+#   - google-maps: 地理資訊
+#
+# Claude SDK Agents (推薦配置):
+#   - filesystem: 檔案系統操作
+#   - puppeteer: **Computer Use 必需**
+#
+# Computer Use 需求:
+#   當 Agent 配置 computer_use_enabled: true 時，
+#   必須在 mcp_servers 中包含 "puppeteer" 伺服器
+#
+# 詳見: docs/DUAL_SDK_ARCHITECTURE.md
+#       docs/MCP_SERVER_CONFIGURATION.md

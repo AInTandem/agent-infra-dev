@@ -100,15 +100,15 @@ class AgentsSection(BaseConfigSection):
         )
         agent_description = gr.TextArea(
             label="Description",
-            lines=3,
-            max_lines=10,
+            lines=2,
+            max_lines=5,
             placeholder="專精於資料收集...",
             value=initial_agent_config.get("description", "") if initial_agent_config else "",
             autoscroll=True
         )
         agent_system_prompt = gr.TextArea(
             label="System Prompt",
-            lines=6,
+            lines=5,
             max_lines=15,
             placeholder="你是一位專業的研究助理...",
             value=initial_agent_config.get("system_prompt", "") if initial_agent_config else "",
@@ -136,6 +136,30 @@ class AgentsSection(BaseConfigSection):
             value=current_model_display if current_model_display else (llm_model_choices[0] if llm_model_choices else ""),
             interactive=True
         )
+
+        # === Dual SDK Fields ===
+        agent_sdk = gr.Radio(
+            label="SDK Type",
+            choices=["qwen", "claude"],
+            value=initial_agent_config.get("sdk", "qwen") if initial_agent_config else "qwen",
+            info="Qwen: Multi-LLM support | Claude: Computer Use & Extended Thinking"
+        )
+
+        # Claude-specific options (shown when SDK is claude)
+        with gr.Group() as claude_options:
+            agent_computer_use = gr.Checkbox(
+                label="Computer Use Enabled",
+                value=initial_agent_config.get("computer_use_enabled", False) if initial_agent_config else False,
+                info="Enable browser/system automation (Claude SDK only)"
+            )
+            agent_extended_thinking = gr.Checkbox(
+                label="Extended Thinking Enabled",
+                value=initial_agent_config.get("extended_thinking_enabled", False) if initial_agent_config else False,
+                info="Enable deep reasoning before response (Claude SDK only)"
+            )
+
+        # === Dual SDK Fields End ===
+
         agent_mcp_servers = gr.CheckboxGroup(
             label="MCP Servers",
             choices=["filesystem", "web-search", "github", "postgres", "google-maps", "puppeteer"],
