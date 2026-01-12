@@ -50,7 +50,7 @@ from api.openapi_server import create_api_server
 from core.agent_manager import AgentManager
 from core.config import ConfigManager
 from core.hot_reload import HotReloadManager
-from core.mcp_bridge import MCPBridge
+from core.mcp_manager import MCPManager
 from core.storage_helpers import create_adapters_from_config
 from core.task_scheduler import TaskScheduler
 from core.websocket_manager import get_websocket_manager
@@ -65,7 +65,7 @@ class Application:
     def __init__(self):
         """Initialize the application."""
         self.config_manager: ConfigManager = None
-        self.mcp_bridge: MCPBridge = None
+        self.mcp_manager: MCPManager = None
         self.agent_manager: AgentManager = None
         self.task_scheduler: TaskScheduler = None
         self.storage_adapter = None
@@ -97,21 +97,23 @@ class Application:
         storage_type = self.config_manager.storage.get("storage", {}).get("type", "file")
         console.print(f"[green]✓[/green] Storage configured ({storage_type})")
 
-        # 3. Initialize MCP Bridge
-        console.print("[dim]3/7. Initializing MCP Bridge...[/dim]")
-        self.mcp_bridge = MCPBridge(self.config_manager)
-        await self.mcp_bridge.initialize()
-        mcp_count = len(self.mcp_bridge._clients)
-        console.print(f"[green]✓[/green] MCP Bridge initialized ({mcp_count} servers)")
+        # 3. Initialize MCP Manager
+        console.print("[dim]3/7. Initializing MCP Manager...[/dim]")
+        self.mcp_manager = MCPManager(self.config_manager)
+        await self.mcp_manager.initialize()
+        mcp_status = self.mcp_manager.get_status()
+        native_count = len(mcp_status["direct_passage"]["servers"])
+        wrapper_count = len(mcp_status["function_wrapper"]["servers"])
+        console.print(f"[green]✓[/green] MCP Manager initialized (native: {native_count}, wrapper: {wrapper_count})")
 
         # 4. Initialize Agent Manager
         console.print("[dim]4/7. Initializing Agent Manager...[/dim]")
         self.agent_manager = AgentManager(
             config_manager=self.config_manager,
-            mcp_bridge=self.mcp_bridge,
+            mcp_manager=self.mcp_manager,
             cache_adapter=self.cache_adapter,
         )
-        await self.agent_manager.initialize(mcp_bridge=self.mcp_bridge)
+        await self.agent_manager.initialize(mcp_manager=self.mcp_manager)
         agent_count = len(self.agent_manager._agents)
         console.print(f"[green]✓[/green] Agent Manager initialized ({agent_count} agents)")
 

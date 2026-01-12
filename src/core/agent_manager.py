@@ -32,8 +32,8 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from core.agent_adapter import AgentAdapterFactory, IAgentAdapter
-from core.config import AgentConfig, ConfigManager
-from core.mcp_bridge import MCPBridge
+from core.config import AgentConfig, ConfigManager, validate_agent_mcp_compatibility
+from core.mcp_manager import MCPManager
 
 
 class AgentManager:
@@ -42,16 +42,17 @@ class AgentManager:
 
     Handles:
     - Agent creation from configuration
-    - MCP tool assignment
+    - MCP tool assignment via MCPManager (native MCP or function call wrapper)
     - Agent lifecycle management
     - Agent lookup and routing
     - Response caching (optional)
+    - MCP compatibility validation
     """
 
     def __init__(
         self,
         config_manager: Optional[ConfigManager] = None,
-        mcp_bridge: Optional[MCPBridge] = None,
+        mcp_manager: Optional[MCPManager] = None,
         cache_adapter: Optional[Any] = None,
     ):
         """
@@ -59,11 +60,11 @@ class AgentManager:
 
         Args:
             config_manager: Configuration manager instance
-            mcp_bridge: MCP Bridge for tool integration
+            mcp_manager: MCP Manager for tool integration (native MCP or function call wrapper)
             cache_adapter: Optional CacheAdapter for response caching
         """
         self.config_manager = config_manager or ConfigManager()
-        self.mcp_bridge = mcp_bridge
+        self.mcp_manager = mcp_manager
         self.cache_adapter = cache_adapter
 
         self._agents: Dict[str, IAgentAdapter] = {}  # Changed from BaseAgent to IAgentAdapter
@@ -76,7 +77,7 @@ class AgentManager:
 
     async def initialize(
         self,
-        mcp_bridge: Optional[MCPBridge] = None,
+        mcp_manager: Optional[MCPManager] = None,
     ) -> None:
         """
         Initialize the AgentManager.
@@ -84,7 +85,7 @@ class AgentManager:
         Loads agent configurations and creates agent instances.
 
         Args:
-            mcp_bridge: Optional MCP Bridge instance
+            mcp_manager: Optional MCP Manager instance
         """
         if self._is_initialized:
             logger.warning("AgentManager already initialized")
@@ -92,9 +93,9 @@ class AgentManager:
 
         logger.info("Initializing AgentManager...")
 
-        # Set MCP Bridge if provided
-        if mcp_bridge:
-            self.mcp_bridge = mcp_bridge
+        # Set MCP Manager if provided
+        if mcp_manager:
+            self.mcp_manager = mcp_manager
 
         # Get agent configurations
         agent_configs = self.config_manager.get_enabled_agents()
@@ -123,6 +124,10 @@ class AgentManager:
         The factory automatically selects the appropriate SDK (Qwen or Claude)
         based on the agent's configuration.
 
+        For agents with native MCP support, this method also:
+        - Validates agent-MCP compatibility
+        - Passes MCP sessions directly to the agent
+
         Args:
             config: Agent configuration
 
@@ -131,10 +136,29 @@ class AgentManager:
         """
         logger.info(f"Creating agent: {config.name}")
 
-        # Get tools for this agent
+        # Get LLM configuration
+        llm_config = self.config_manager.llm
+
+        # Validate agent-MCP compatibility if MCP servers are configured
+        if config.mcp_servers and self.mcp_manager:
+            try:
+                # Get all MCP server configurations
+                mcp_configs = {}
+                for server_name in config.mcp_servers:
+                    server_config = self.config_manager.get_mcp_server(server_name)
+                    if server_config:
+                        mcp_configs[server_name] = server_config
+
+                validate_agent_mcp_compatibility(config, llm_config, mcp_configs)
+                logger.debug(f"[{config.name}] MCP compatibility validated")
+            except ValueError as e:
+                logger.error(f"[{config.name}] MCP compatibility check failed: {e}")
+                raise
+
+        # Get tools for this agent (format depends on LLM MCP support)
         tools = []
-        if self.mcp_bridge and config.mcp_servers:
-            tools = self.mcp_bridge.get_tools_for_agent(config.mcp_servers)
+        if self.mcp_manager and config.mcp_servers:
+            tools = self.mcp_manager.get_tools_for_agent(config, llm_config)
             logger.debug(f"[{config.name}] Loaded {len(tools)} tools from {config.mcp_servers}")
 
         # Get LLM instance
@@ -145,8 +169,21 @@ class AgentManager:
             config=config,
             llm=llm,
             tools=tools,
-            mcp_bridge=self.mcp_bridge
+            mcp_bridge=None  # No longer using old MCPBridge
         )
+
+        # For native MCP models, pass MCP sessions directly to the agent
+        if config.mcp_servers and self.mcp_manager:
+            llm_supports_mcp = llm_config.get_model_mcp_support(config.llm_model)
+            if llm_supports_mcp:
+                logger.debug(f"[{config.name}] LLM supports native MCP, passing sessions")
+                for server_name in config.mcp_servers:
+                    session = await self.mcp_manager.get_mcp_session(server_name, config)
+                    if session:
+                        await agent.use_mcp_session(session)
+                        logger.debug(
+                            f"[{config.name}] Passed MCP session for '{server_name}'"
+                        )
 
         # Store the agent
         self._agents[config.name] = agent
@@ -556,7 +593,7 @@ _agent_manager: Optional[AgentManager] = None
 
 async def get_agent_manager(
     config_manager: Optional[ConfigManager] = None,
-    mcp_bridge: Optional[MCPBridge] = None,
+    mcp_manager: Optional[MCPManager] = None,
     cache_adapter: Optional[Any] = None,
     force_refresh: bool = False
 ) -> AgentManager:
@@ -565,7 +602,7 @@ async def get_agent_manager(
 
     Args:
         config_manager: Optional configuration manager
-        mcp_bridge: Optional MCP Bridge
+        mcp_manager: Optional MCP Manager for tool integration
         cache_adapter: Optional CacheAdapter for response caching
         force_refresh: Force re-initialization
 
@@ -576,6 +613,6 @@ async def get_agent_manager(
 
     if _agent_manager is None or force_refresh:
         _agent_manager = AgentManager(config_manager, cache_adapter=cache_adapter)
-        await _agent_manager.initialize(mcp_bridge)
+        await _agent_manager.initialize(mcp_manager)
 
     return _agent_manager
